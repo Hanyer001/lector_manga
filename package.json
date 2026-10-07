@@ -1,0 +1,33 @@
+{
+  "name": "manga-reader-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "preserver": "node scripts/prepare-client.js",
+    "server": "node --env-file-if-exists=.env src/backend/server.js",
+    "build:pages": "node scripts/build-pages.js",
+    "build:render": "node scripts/build-render.js",
+    "pretest:ui": "node scripts/prepare-client.js",
+    "test:ui": "playwright test",
+    "demo": "node examples/demo.js",
+    "demo:reader": "node examples/reader-demo.js",
+    "test": "node --test --test-isolation=none"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "better-sqlite3": "^12.11.1",
+    "cheerio": "^1.1.2",
+    "express": "^5.2.1",
+    "puppeteer-core": "25.12.0",
+    "sql.js": "1.14.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0"
+  }
+}

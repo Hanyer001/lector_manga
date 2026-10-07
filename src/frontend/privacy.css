@@ -1,0 +1,25 @@
+.privacy-gate { max-width:560px; margin:32px auto; padding:clamp(24px,5vw,48px); border:1px solid var(--line); border-radius:var(--radius-panel); background:var(--panel); text-align:center; }
+.privacy-gate h2 { font-size:clamp(1.6rem,4vw,2rem); letter-spacing:-.04em; margin:16px 0; }
+.privacy-gate p { line-height:1.65; margin:16px 0; }
+.gate-symbol { display:inline-grid; place-items:center; width:64px; height:64px; border:1px solid var(--line); border-radius:20px; color:var(--accent-text); font-size:1.2rem; font-weight:600; margin-bottom:20px; }
+.privacy-gate form { display:grid; gap:12px; margin:24px auto; max-width:300px; text-align:left; }
+.privacy-gate input { text-align:center; letter-spacing:.3em; font-size:1.25rem; width:100%; }
+.privacy-gate form .button { margin-top:8px; width:100%; }
+.privacy-gate #private-status { color:var(--accent-text); }
+#private-query { max-width:460px; width:100%; margin-bottom:12px; }
+#private-count { margin:12px 0 20px; }
+#private-change-form { display:grid; gap:12px; max-width:320px; margin-top:20px; }
+.series-privacy { border-top:1px solid var(--line); padding-top:20px; margin-top:24px; }
+.series-privacy p { margin-top:10px; }
+.privacy-empty { padding:40px 24px; border:1px dashed var(--line); border-radius:var(--radius-card); color:var(--muted); line-height:1.6; grid-column:1/-1; }
+@media(max-width:959px) { .library-tabs { gap:2px; padding-inline:4px; } .library-tabs .button { min-width:0; padding-inline:4px; font-size:.72rem; } }
+@media(max-width:599px) {
+.search-genre-label { display:flex; align-items:center; gap:12px; margin:20px 0 12px; font-size:.85rem; color:var(--muted); }
+.search-genre-label select { max-width:250px; }
+}
+#private-session-settings { margin-top:28px; display:grid; gap:12px; max-width:640px; }
+#private-session-settings[hidden] { display:none; }
+#private-session-settings select { width:100%; }
+#vault-background-mask { display:none; }
+body.vault-background-hidden > :not(#vault-background-mask) { visibility:hidden!important; }
+body.vault-background-hidden #vault-background-mask { display:grid; position:fixed; inset:0; z-index:10000; place-items:center; padding:24px; background:#000; color:var(--text); text-align:center; }

@@ -1,0 +1,85 @@
+/* Único catálogo de colores: los componentes consumen tokens, no colores literales. */
+:root {
+ color-scheme:dark; --bg:#000000; --panel:#0a0a0a; --raised:#121212;
+ --text:#e0e0e0; --muted:#a3a3aa; --line:#282828;
+ --accent-color:#a78bfa; --accent:var(--accent-color); --accent-text:var(--accent-color);
+ --accent-soft:color-mix(in srgb,var(--accent-color) 13%,transparent); --on-accent:#080808;
+ --glass:rgba(10,10,10,.85); --scrim:rgba(0,0,0,.7);
+ --reader-black:#000000; --reader-surface:#0a0a0a; --reader-raised:#121212; --reader-line:#282828; --reader-glass:rgba(0,0,0,.6); --reader-muted:#b4b4ba; --text-on-image:#e0e0e0;
+ --cover-gradient:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.65) 45%,transparent 100%);
+ --cover-text-shadow:0 1px 8px rgba(0,0,0,.8); --floating-shadow:0 6px 24px rgba(0,0,0,.4);
+ --radius-control:8px; --radius-card:8px; --radius-panel:16px; --reader-width:760px;
+ font:16px/1.5 Inter,Roboto,system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+:root[data-theme='oled'] { --bg:#000000; --panel:#0a0a0a; --raised:#121212; --text:#e0e0e0; --glass:rgba(0,0,0,.85); }
+:root[data-theme='dark'] { --bg:#0b0d12; --panel:#151821; --raised:#202431; --muted:#a6adbb; --line:#343b4c; --glass:rgba(11,13,18,.85); }
+:root[data-theme='light'] { color-scheme:light; --bg:#f7f8fa; --panel:#ffffff; --raised:#eef0f4; --text:#151821; --muted:#596273; --line:#d1d6df; --glass:rgba(247,248,250,.9); --scrim:rgba(17,24,39,.3); }
+/* Tonos auxiliares heredados para avisos, sombras y estados; centralizados aquí. */
+:root {
+ --palette-0:#22201f;
+ --palette-1:#000b;
+ --palette-2:#add;
+ --palette-3:#0003;
+ --palette-4:#1d1d1d;
+ --palette-5:#080808f5;
+ --palette-6:#303030;
+ --palette-7:#101010;
+ --palette-8:#202020;
+ --palette-9:#626262;
+ --palette-10:#eeeae4;
+ --palette-11:#111;
+ --palette-12:#e0e0e0;
+ --palette-13:#171717;
+ --palette-14:#363636;
+ --palette-15:#8a8a8a;
+ --palette-16:#838383;
+ --palette-17:#2a2826;
+ --palette-18:#191715;
+ --palette-19:#121212;
+ --palette-20:#25201c;
+ --palette-21:#aca49e;
+ --palette-22:#a99b8f;
+ --palette-23:#000a;
+ --palette-24:#8d786333;
+ --palette-25:#8d78631a;
+ --palette-26:#807367;
+ --palette-27:#858585;
+ --palette-28:#7e7e7e;
+ --palette-29:#aaa;
+ --palette-30:#3b3b3b;
+ --palette-31:#151515;
+ --palette-32:#0009;
+ --palette-33:#383838;
+ --palette-34:#272422;
+ --palette-35:#141414;
+ --palette-36:#b1a496;
+ --palette-37:#ffffff0a;
+ --palette-38:#ffffff24;
+ --palette-39:#080808d9;
+ --palette-40:#eee;
+ --palette-41:#888;
+ --palette-42:#f2d4bc;
+ --palette-43:#454545;
+ --palette-44:#191919;
+ --palette-45:#dfb6aa;
+ --palette-46:#292020;
+ --palette-47:#343434;
+ --palette-48:#a5a5a5;
+ --palette-49:#222;
+ --palette-50:#2b2b2b;
+ --palette-51:#555;
+ --palette-52:#0007;
+ --palette-53:#181818;
+ --palette-54:#3a3a3a;
+ --palette-55:#e0c6a7;
+ --palette-56:#544738;
+ --palette-57:#201c17;
+ --palette-58:#909090;
+ --palette-59:#d5ba9f;
+ --palette-60:#282828;
+ --palette-61:#0b0b0bf2;
+ --palette-62:#36302b;
+ --palette-63:#111e;
+ --palette-64:#ffffff38;
+ --palette-65:rgba(8,8,8,.9);
+}

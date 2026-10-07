@@ -1,0 +1,28 @@
+.account-panel { border:1px solid var(--line); border-radius:16px; padding:24px; background:var(--panel); margin-bottom:24px; scroll-margin-top:90px; }
+.account-panel h2 { font-size:1.4rem; letter-spacing:-.035em; margin-bottom:10px; }
+.account-panel p { margin-block:8px; overflow-wrap:anywhere; }
+.account-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.account-transfer { border-top:1px solid var(--line); margin-top:24px; padding-top:18px; }
+.account-transfer label { display:flex; gap:10px; align-items:center; min-height:44px; margin-block:14px; }
+.account-transfer input[type=checkbox] { width:20px; height:20px; accent-color:var(--accent); }
+.account-gate { min-height:100vh; min-height:100svh; display:grid; place-items:center; padding:32px max(20px,env(safe-area-inset-left)) max(32px,env(safe-area-inset-bottom)); background:radial-gradient(ellipse at top,var(--palette-0),var(--bg) 65%); }
+.account-gate-card { max-width:450px; width:100%; padding:36px 28px; border:1px solid var(--line); border-radius:24px; background:var(--glass,var(--panel)); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
+.account-gate h1 { font-size:clamp(2rem,8vw,3rem); line-height:1.08; letter-spacing:-.06em; margin-block:22px 16px; }
+.account-gate p { margin-bottom:22px; }
+.account-gate .button { width:100%; min-height:48px; }
+.account-gate label { display:block; margin-bottom:8px; font-size:.9rem; }
+.account-gate input { display:block; width:100%; min-height:48px; margin-bottom:16px; padding:12px 14px; font-size:16px; color:var(--text); background:var(--raised); border:1px solid var(--line); border-radius:var(--radius-control); }
+.account-gate input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.account-gate input::placeholder { color:var(--muted); }
+.account-required .topbar,.account-required #library,.account-required #reader,.account-required #reader-overlay,.account-required #exit-focus { display:none!important; }
+.account-open { min-width:44px; min-height:44px; }
+.account-private-dialog { width:min(420px,calc(100vw - 32px)); padding:24px; border:1px solid var(--line); border-radius:20px; background:var(--panel); color:var(--text); }
+.account-private-dialog::backdrop { background:var(--palette-1); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); }
+.account-private-dialog h2 { margin-block:12px; }
+.account-private-dialog label { display:block; margin-block:14px 6px; }
+.account-private-dialog input { display:block; width:100%; min-height:44px; font-size:16px; padding:10px 12px; background:var(--raised); color:var(--text); border:1px solid var(--line); border-radius:var(--radius-control); }
+@media(max-width:599px) { .account-panel { padding:20px 16px; } .account-actions .button { flex:1 1 140px; min-height:44px; } input,select,textarea { font-size:16px; } }
+@supports(padding:env(safe-area-inset-top)) { .reader-overlay-top { padding-top:max(12px,env(safe-area-inset-top)); } }
+/* La clave de recuperación solo se muestra durante su entrega al usuario. */
+#vault-recovery-dialog { max-width:min(34rem,calc(100vw - 2rem)); }
+#vault-recovery-key { width:100%; box-sizing:border-box; min-height:5rem; resize:none; font:16px/1.6 ui-monospace,monospace; overflow-wrap:anywhere; background:var(--raised); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:1rem; }

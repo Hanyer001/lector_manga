@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: lector-manga-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:render
+    startCommand: npm run server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: INSTALL_BROWSER
+        value: '1'
+      - key: NODE_ENV
+        value: production
+      - key: APP_MODE
+        value: cloud
+      - key: PUBLIC_API_ORIGIN
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLIC_KEY
+        sync: false
+      - key: IMAGE_TICKET_SECRET
+        generateValue: true
