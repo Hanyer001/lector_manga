@@ -21,6 +21,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: node --test --test-isolation=none test/interface-usability.test.js
       - run: npm run build:pages
         env:
           PUBLIC_API_ORIGIN: ${{ vars.RENDER_API_ORIGIN }}

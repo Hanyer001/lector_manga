@@ -1,3 +1,6 @@
+import {createChapterBrowser} from './chapter-browser.js';
+import {libraryProgress,publicationLabels} from './library-progress.js';
+import {tagLabel} from './discovery-core.js';
 import { renderSeriesCards } from './library-view.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
@@ -38,7 +41,15 @@ let libraryScrollY = 0;
 let readerScrollY = 0;
 let readerPoint = null;
 const dialogOrigins = new Map();
-const dialogs = ['add-panel','chapter-controls','folder-panel'];
+const dialogs = ['add-panel','chapter-controls','folder-panel','more-panel'];
+const chapterBrowser = createChapterBrowser($('chapter-browser'), {onChoose: chapter => openChapter(chapter.id)});
+let pickedChapterId = null;
+$('picked-read').addEventListener('click', () => { if (pickedChapterId != null) openChapter(pickedChapterId); });
+$('show-more').addEventListener('click', () => setDialog('more-panel', true));
+$('more-close').addEventListener('click', () => setDialog('more-panel', false));
+for (const button of document.querySelectorAll('[data-more-view]')) button.addEventListener('click', () => navigateView(button.dataset.moreView));
+$('more-account').addEventListener('click', () => { setDialog('more-panel', false); $('account-open').click(); });
+for (const button of document.querySelectorAll('[data-welcome]')) button.addEventListener('click', () => button.dataset.welcome === 'add' ? setDialog('add-panel', true) : navigateView(button.dataset.welcome));
 let shell;
 let privacy;
 let readerUI;
@@ -109,6 +120,7 @@ function setLibrary(open, { opening = false } = {}) {
   setDialog('chapter-controls', false);
   setDialog('add-panel', false);
   setDialog('folder-panel', false);
+  setDialog('more-panel', false);
   if (open !== wasOpen) {
     restoring = true;
     window.scrollTo(0, open ? libraryScrollY : current ? readerScrollY : 0);
@@ -132,7 +144,8 @@ function setDialog(id, open) {
   $('reader').inert = modalOpen;
   for (const child of $('library').children) if (!dialogs.includes(child.id)) child.inert = modalOpen;
   if (id === 'add-panel') $('add-toggle').setAttribute('aria-expanded', String(open));
-  if (open) (id === 'add-panel' ? $('series-url') : id === 'folder-panel' ? $('folder-name') : $('picker-close')).focus({ preventScroll: true });
+  if (id === 'more-panel') $('show-more').setAttribute('aria-expanded', String(open));
+  if (open) (id === 'add-panel' ? $('series-url') : id === 'folder-panel' ? $('folder-name') : id === 'more-panel' ? $('more-close') : $('picker-close')).focus({ preventScroll: true });
   else dialogOrigins.get(id)?.focus({ preventScroll: true });
 }
 
@@ -568,6 +581,12 @@ function updateNavigation() {
 }
 
 function fillChapters(list) {
+  const saved = series.find(item => String(item.id) === $('series-select').value);
+  const resume = list.find(chapter => chapter.id === saved?.ultimo_capitulo_id);
+  pickedChapterId = (resume ?? list.find(chapter => !chapter.estado_lectura) ?? list[0])?.id ?? null;
+  $('picked-read').disabled = pickedChapterId == null;
+  $('picked-read').textContent = resume ? 'Continuar · ' + (resume.titulo ?? resume.title) : 'Empezar a leer';
+  chapterBrowser.update(list, {lastId: saved?.ultimo_capitulo_id});
   $('chapter-select').replaceChildren(new Option(list.length ? 'Seleccionar capítulo…' : 'Sin capítulos guardados', ''));
   for (const chapter of list) $('chapter-select').add(new Option(`${chapter.estado_lectura ? '✓ ' : ''}${chapter.titulo}`, chapter.id));
   $('chapter-select').disabled = !list.length;
@@ -584,13 +603,14 @@ async function loadLibraryChapters(sync = false) {
   if (!id) { fillChapters([]); endQuery(controller); return; }
   $('library-status').textContent = sync ? 'Buscando capítulos en el sitio…' : 'Cargando capítulos…';
   $('picker-status').textContent = $('library-status').textContent;
+  chapterBrowser.loading(); $('picked-read').disabled = true;
   try {
     const list = await api(`/api/series/${id}/${sync ? 'sync' : 'chapters'}`, sync ? { method: 'POST', signal: controller.signal } : { signal: controller.signal });
     if (version !== libraryGeneration) return;
     fillChapters(list);
     $('library-status').textContent = list.length ? `${list.length} capítulos disponibles` : 'Pulsa Actualizar capítulos para consultarlos en el sitio.';
     $('picker-status').textContent = $('library-status').textContent;
-  } catch (error) { if (version === libraryGeneration) { $('library-status').textContent = controller.signal.aborted ? 'Consulta cancelada.' : error.message; $('picker-status').textContent = $('library-status').textContent; } }
+  } catch (error) { if (version === libraryGeneration) { $('library-status').textContent = controller.signal.aborted ? 'Consulta cancelada.' : error.message; $('picker-status').textContent = $('library-status').textContent; chapterBrowser.clear(); } }
   finally { endQuery(controller); if (version === libraryGeneration) $('sync-chapters').disabled = false; }
 }
 async function loadLibrary() {
@@ -631,6 +651,7 @@ async function loadLibrary() {
     privacy?.render();
     filterLibrary(selectedSeries);
     renderHero();
+    $('library-welcome').hidden = !['home','library'].includes(activeView) || series.some(isPublicReading);
     api('/api/storage').then(info => { $('storage-status').textContent = 'Lectura sin descargas guardadas · Base de datos: ' + (info.databaseBytes / 1024).toFixed(0) + ' KB · ' + info.chapters + ' enlaces de capítulos'; }).catch(() => {});
     const publicItems=series.filter(item=>!item.is_private),count=groupWorks(publicItems).length;
     $('library-status').textContent = count ? `${count} ${count === 1 ? 'obra' : 'obras'} · ${publicItems.length} fuentes guardadas` : 'Añade el enlace de una serie para comenzar.';
@@ -645,8 +666,15 @@ function renderHero() {
   const publicWorks=groupWorks(series.filter(isPublicReading));
   heroSeries = publicWorks.sort((a, b) => (b.ultima_lectura ?? 0) - (a.ultima_lectura ?? 0)).find(item => item.ultimo_capitulo_id) ?? publicWorks[0];
   $('continue-hero').hidden = !heroSeries;
-  if (!heroSeries) { for(const id of ['hero-title','hero-chapter','hero-source'])$(id).textContent='';$('hero-cover').removeAttribute('src');return; }
+  if (!heroSeries) { for(const id of ['hero-title','hero-chapter','hero-source'])$(id).textContent='';$('hero-cover').removeAttribute('src');$('hero-backdrop').removeAttribute('src');$('hero-progress').hidden=true;return; }
   $('hero-title').textContent = heroSeries.titulo;
+  const progress = libraryProgress(heroSeries);
+  $('hero-progress').hidden = !progress.total; $('hero-progress-bar').value = progress.percent;
+  $('hero-progress-copy').textContent = `${progress.read} de ${progress.total} capítulos marcados como leídos`;
+  const backdrop = $('hero-backdrop'); backdrop.hidden = !isProxyUrl(heroSeries.coverUrl);
+  if (!backdrop.hidden && (backdrop.dataset.cover ?? backdrop.getAttribute('src')) !== heroSeries.coverUrl) setCover(backdrop, heroSeries.coverUrl, heroSeries.coverKey);
+  else if (backdrop.hidden) backdrop.removeAttribute('src');
+  backdrop.onerror = () => { backdrop.hidden = true; };
   $('hero-label').textContent = heroSeries.ultimo_capitulo_id ? 'CONTINÚA DONDE LO DEJASTE' : 'UNA HISTORIA PARA EMPEZAR';
   $('hero-chapter').textContent = heroSeries.ultimo_capitulo ?? `${heroSeries.total_capitulos ?? 0} capítulos en tu biblioteca`;
   $('hero-source').textContent = sourceName(heroSeries.source);
@@ -670,6 +698,13 @@ async function selectSeries(item) {
   $('picked-title').textContent = item.work_title??item.titulo; $('picked-source').textContent = sourceName(item.source)+(item.work_title&&item.titulo!==item.work_title?` · ${item.titulo}`:'');
   shell?.organize(item);
   privacy?.organize(item);
+  chapterBrowser.clear();
+  $('picked-authors').textContent = item.authors?.length ? 'Autoría: ' + item.authors.join(', ') : 'Autoría no disponible';
+  $('picked-publication').textContent = publicationLabels[item.status] ?? 'Estado de publicación no disponible';
+  $('picked-tags').replaceChildren(...[...(item.genres ?? []), ...(item.themes ?? [])].map(value => Object.assign(document.createElement('span'), {className:'metadata-tag',textContent:tagLabel(value)})));
+  const progress = libraryProgress(item);
+  $('picked-progress').textContent = `${progress.label} · ${progress.read} de ${progress.total} capítulos marcados como leídos`;
+  if (!$('picked-description').textContent) $('picked-description').textContent = 'Esta fuente no incluye una sinopsis.';
   const cover = $('picked-cover'); cover.hidden = !item.coverUrl;
   if (isProxyUrl(item.coverUrl)) setCover(cover,item.coverUrl,item.coverKey); else cover.removeAttribute('src');
   cover.onerror = () => { cover.hidden = true; };
@@ -677,7 +712,7 @@ async function selectSeries(item) {
   setDialog('chapter-controls', true);
   dialogOrigins.set('chapter-controls', origin?.isConnected ? origin : document.querySelector('#series-grid .series-card.selected .series-choice') ?? $('show-saved'));
   await loadLibraryChapters();
-  if (!$('chapter-controls').hidden) $('chapter-select').focus({ preventScroll: true });
+  if (!$('chapter-controls').hidden) chapterBrowser.focus();
 }
 function visibleSeries() { return groupWorks(filterSeries(series.filter(item=>inLibraryScope(item,$('genre-filter').value==='adult'?'adult':'library')), { source: $('source-filter').value, query: $('library-query').value,
   unreadOnly: $('only-unread').checked, sort: $('library-sort').value,genre:$('genre-filter').value,author:$('author-filter').value,
@@ -722,13 +757,15 @@ function navigateView(view, push = true) {
   privacy?.leave(view);
   const sections = {home:'home-panel',library:'saved-panel',discover:'discover-panel',explore:'search-panel',settings:'settings-panel',private:'private-panel'};
   for (const [name,id] of Object.entries(sections)) $(id).hidden = name !== view;
-  const title = {home:'Una historia más',library:'Mi biblioteca',discover:'Descubrir',explore:'Explorar',settings:'A tu manera',private:'Mi espacio privado'};
+  const title = {home:'Una historia más',library:'Mi biblioteca',discover:'Descubrir',explore:'Buscar',settings:'A tu manera',private:'Mi espacio privado'};
   const subtitle = {home:'Retoma tus historias y sigue sus actualizaciones.',library:'Todas tus historias, a tu ritmo.',discover:'Tu siguiente historia empieza aquí.',explore:'Elige tus fuentes y encuentra tu próxima lectura.',settings:'Tu tema, tu color, tu espacio.',private:'Tus historias, fuera de las vistas habituales.'};
   $('library-title').replaceChildren(document.createTextNode(title[view]),Object.assign(document.createElement('span'),{className:'heading-dot',textContent:'.'}));
   $('library-subtitle').textContent=subtitle[view];
   const buttons={home:'show-home',library:'show-saved',discover:'show-discover',explore:'show-search',settings:'show-settings',private:'show-private'};
   for (const [name,id] of Object.entries(buttons)) { $(id).setAttribute('aria-pressed',String(view===name));$(id).className='button '+(view===name?'primary':'subtle'); }
-  $(buttons[view]).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
+  $('show-more').setAttribute('aria-pressed', String(['settings','private'].includes(view)));
+  $('library-welcome').hidden = !['home','library'].includes(view) || series.some(isPublicReading);
+  (matchMedia('(max-width:768px)').matches && ['settings','private'].includes(view) ? $('show-more') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
   if (push && location.hash !== '#'+view) history.pushState({view},'',location.pathname+'#'+view);
   document.title=view==='private'?'Lector · Biblioteca privada':view==='discover'?'Lector · Descubrir':'Lector · Tu biblioteca';
   privacy?.enter(view);
@@ -885,7 +922,9 @@ function clearSensitive({onlySeries}={}) {
   if(!current){$('overlay-series').textContent='';$('overlay-title').textContent='Lectura cerrada';$('series-title').textContent='TU LECTURA';}
   for(const [id,item] of Object.entries(cache))if(sensitiveIds.has(item.serie_id))delete cache[id];saveCache();
   for(const id of sensitiveIds)delete pendingProgress[id];persistPending();
-  setDialog('chapter-controls',false);$('picked-title').textContent='Elige un capítulo';$('picked-description').textContent=$('picked-source').textContent='';$('picked-cover').removeAttribute('src');
+  setDialog('chapter-controls',false);$('picked-title').textContent='Elige un capítulo';$('picked-description').textContent=$('picked-source').textContent='';
+  for (const id of ['picked-authors','picked-publication','picked-progress']) $(id).textContent='';
+  $('picked-tags').replaceChildren(); chapterBrowser.clear(); pickedChapterId=null; $('picked-read').disabled=true;$('picked-cover').removeAttribute('src');
   for(const id of ['edition-select','edition-from','edition-existing'])$(id).replaceChildren();
   $('series-select').replaceChildren();fillChapters([]);filterLibrary();renderHero();shell?.renderHome();shell?.clearDiscovery();shell?.clearSearch();
   shell?.clearPrivate();
@@ -893,7 +932,7 @@ function clearSensitive({onlySeries}={}) {
   return saved;
 }
 let alternatives;
-const preview=createSeriesPreview({api,add:addFavorite,select:selectSeries,sourceName,alternatives:(...args)=>alternatives(...args),read:(item,chapter,list)=>openChapter(chapter.id,{trial:{item,list,returnView:activeView}}),findSaved:item=>series.find(row=>!row.is_private&&row.source===item.source&&row.url_origen===(item.url??item.url_origen))});
+const preview=createSeriesPreview({api,add:addFavorite,select:selectSeries,sourceName,alternatives:(...args)=>alternatives(...args),read:(item,chapter,list,options)=>options?.saved ? openChapter(item.ultimo_capitulo_id) : openChapter(chapter.id,{trial:{item,list,returnView:activeView}}),findSaved:item=>series.find(row=>!row.is_private&&row.source===item.source&&row.url_origen===(item.url??item.url_origen))});
 alternatives=createSourceAlternatives({api,state:()=>({series,sources:sourceCatalog}),preview,select:selectSeries,sourceName});
 $('reader-trial-ficha').addEventListener('click',()=>{if(!current?.trial)return;const {item,returnView}=current.trial;navigateView(returnView);preview(item);});
 $('reader-failed-alternatives').addEventListener('click',()=>$('reader-alternatives').click());

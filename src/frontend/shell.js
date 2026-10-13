@@ -42,6 +42,8 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('continue-carousel').scrollBy({left:(id==='continue-prev'?-1:1)*400,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   });
   function renderHome() {
+    const synced = state().series.filter(isPublicReading).map(item => Number(item.last_sync_at) || 0).filter(Boolean);
+    $('library-updated').textContent = synced.length ? 'Última actualización de capítulos: ' + new Date(Math.max(...synced)).toLocaleString('es', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Actualiza tus series para ver nuevos capítulos.';
     const recent=groupWorks(state().series.filter(isPublicReading)).filter(item=>item.ultimo_capitulo_id).sort((a,b)=>(b.ultima_lectura??0)-(a.ultima_lectura??0)).slice(0,10);
     renderSeriesCards($('continue-carousel'),recent,{sourceName,onSelect:select,onResume:resume});
     if(!recent.length) $('continue-carousel').replaceChildren(text('p','Tus últimas lecturas aparecerán aquí.','series-empty'));

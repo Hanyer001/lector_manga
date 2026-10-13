@@ -1,3 +1,4 @@
+import {libraryProgress} from './library-progress.js';
 import { tagLabel } from './discovery-core.js';
 import { isAdult } from './content-policy.js';
 import { cloudMode, isProxyUrl, setCover } from './network.js';
@@ -58,6 +59,14 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
     if(onFeedback)details.textContent=[...(item.genres??[]),...(item.themes??[])].slice(0,2).map(tagLabel).join(' · ')||sourceName(item.source);
     if(isAdult(item))details.textContent+=' · +18';
     card.append(choose, details);
+    if (!onAdd) {
+      const progress = libraryProgress(item), section = document.createElement('div'); section.className = 'library-progress';
+      const label = document.createElement('span'); label.className = 'reading-state'; label.textContent = progress.label;
+      const last = document.createElement('p'); last.className = 'last-chapter'; last.textContent = item.ultimo_capitulo ? 'Último abierto: ' + item.ultimo_capitulo : 'Todavía sin empezar';
+      section.append(label, last);
+      if (progress.total) { const bar = document.createElement('progress'); bar.max = 100; bar.value = progress.percent; bar.setAttribute('aria-label', progress.read + ' de ' + progress.total + ' capítulos marcados como leídos'); const count = document.createElement('span'); count.className = 'read-count'; count.textContent = progress.read + ' / ' + progress.total + ' leídos'; section.append(bar, count); }
+      card.append(section);
+    }
     if(item.reason){const reason=document.createElement('p');reason.className='recommendation-reason';reason.textContent=item.reason;card.append(reason);}
     const actions = document.createElement('div'); actions.className = 'card-actions'; card.append(actions);
     const action = (text, handler, primary = false) => {
