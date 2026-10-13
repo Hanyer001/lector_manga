@@ -167,3 +167,13 @@
   .series-preview .picked-series img { width:82px; height:120px; }
 }
 @media (max-width:359px) { .series-grid,:root[data-density='compact'] .series-grid { gap:22px 10px; } .series-card .card-actions > .button { font-size:.67rem; } .library-tabs .button { font-size:.62rem; } }
+
+/* Orden y filtros comunes en ambas bibliotecas. */
+.library-sort-control { display:flex; flex-direction:column; gap:4px; font-size:.72rem; color:var(--muted); min-width:220px; }
+.library-sort-control select { width:100%; }
+.shelf-tools > .search-field { flex:1; }
+.shelf-tools { align-items:end; flex-wrap:wrap; }
+#private-filter-chips { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.discovery-catalog-hint { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:12px 16px; margin:12px 0 20px; border:1px solid var(--line); border-radius:12px; }
+.discovery-catalog-hint p { margin:0; }
+@media(max-width:599px) { .library-sort-control { min-width:0; flex:1; } .shelf-tools > .search-field { flex-basis:100%; } .discovery-catalog-hint { align-items:start; flex-direction:column; } }

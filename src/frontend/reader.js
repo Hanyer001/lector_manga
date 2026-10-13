@@ -657,6 +657,7 @@ async function loadLibrary() {
     $('library-status').textContent = count ? `${count} ${count === 1 ? 'obra' : 'obras'} · ${publicItems.length} fuentes guardadas` : 'Añade el enlace de una serie para comenzar.';
     if(cloudMode){const visible=new Set(publicSeries.map(item=>item.id));for(const [id,item] of Object.entries(cache))if(!visible.has(item.serie_id))delete cache[id];for(const id of Object.keys(pendingProgress))if(!visible.has(Number(id)))delete pendingProgress[id];saveCache();persistPending();}
     window.dispatchEvent(new CustomEvent('library-loaded',{detail:{revision:libraryRevision}}));
+    if($('home-notice').textContent.startsWith('No se pudo cargar la biblioteca.'))notice();
     return true;
   } catch (error) { $('library-status').textContent = error.message; notice(cloudMode?'No se pudo cargar la biblioteca. Comprueba tu conexión e inicia sesión de nuevo si es necesario.':'No se pudo cargar la biblioteca. Comprueba que la API local esté disponible.');return false; }
 }
@@ -937,10 +938,10 @@ alternatives=createSourceAlternatives({api,state:()=>({series,sources:sourceCata
 $('reader-trial-ficha').addEventListener('click',()=>{if(!current?.trial)return;const {item,returnView}=current.trial;navigateView(returnView);preview(item);});
 $('reader-failed-alternatives').addEventListener('click',()=>$('reader-alternatives').click());
 $('reader-alternatives').addEventListener('click',()=>{const info=failedReading??(current?{item:current.trial?.item??series.find(item=>item.id===current.serie_id),number:current.number??current.numero??null}:null);if(info?.item&&!info.item.is_private)alternatives(info.item,{number:info.number});});
-shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog}),navigate:navigateView,select:selectSeries,
+shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:activeView,privateUnlocked:privacy?.unlocked()??false}),navigate:navigateView,select:selectSeries,
   resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,filter:()=>filterLibrary(),reload:loadLibrary,
   dialog:setDialog,beginQuery,endQuery});
-privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
+privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog,folders:shell?.folders()??[]}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
 window.addEventListener('popstate',()=>{const view=location.hash.slice(1);if(['home','library','discover','explore','settings','private'].includes(view))navigateView(view,false);else if(current)setLibrary(false);else navigateView('home',false);});
 const accountUI=createAccountUI({api,reload:loadLibrary,navigate:navigateView,lockPrivate:()=>privacy.lock(),beforeSignOut:async()=>{await flushProgress();if(writer.running)await writer.running;await privacy.lock();}});
 const canLoad=await accountUI.start();
