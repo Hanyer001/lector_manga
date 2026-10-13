@@ -4,15 +4,25 @@ import {createVaultEncryption} from '../src/frontend/vault-crypto.js';
 import {openDatabase} from '../src/storage/database.js';
 import {USERS} from '../test/helpers/account-store.js';
 let demo;
+async function navigateSection(page, view) {
+  const target=page.locator(view==='settings'?'#show-settings':'#show-private');
+  if(await target.isVisible())return target.click();
+  await page.locator('#show-more').click();
+  await page.locator('[data-more-view="'+view+'"]').click();
+}
+async function revealResultOptions(page) {
+  const details=page.locator('#discovery-result-options');
+  if(await details.getAttribute('open')===null)await details.locator('summary').click();
+}
 
 test('OLED: navegación adaptable, tarjetas sobre portada y acento persistente',async({page},testInfo)=>{
   await page.goto(demo.web);await expect(page.locator('#add-toggle')).toBeEnabled();
   await expect(page.locator('html')).toHaveAttribute('data-theme','oled');
   await page.locator('#show-saved').click();
   const layout=await page.evaluate(()=>{const nav=document.querySelector('.library-tabs').getBoundingClientRect(),card=document.querySelector('#series-grid .series-card'),caption=card.querySelector('.series-caption');return {width:innerWidth,bottom:nav.bottom,left:nav.left,navWidth:nav.width,background:getComputedStyle(document.body).backgroundColor,captionPosition:getComputedStyle(caption).position,border:getComputedStyle(card).borderTopWidth,overflow:document.documentElement.scrollWidth>innerWidth};});
-  expect(layout.background).toBe('rgb(0, 0, 0)');expect(layout.border).toBe('0px');expect(layout.captionPosition).toBe('absolute');expect(layout.overflow).toBe(false);
+  expect(layout.background).toBe('rgb(0, 0, 0)');expect(layout.border).toBe('0px');expect(layout.captionPosition).toBe('static');expect(layout.overflow).toBe(false);
   if(layout.width<=768)expect(layout.navWidth).toBeGreaterThan(300);else expect(layout.navWidth).toBeLessThan(250);
-  await page.locator('#show-settings').click();await page.locator('#appearance-theme').selectOption('light');
+  await navigateSection(page,'settings');await page.locator('#appearance-theme').selectOption('light');
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   await page.locator('#appearance-theme').selectOption('oled');await page.locator('#appearance-accent').selectOption('cyan');await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','oled');
   expect(await page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--accent-color').trim().toLowerCase())).toBe('#22d3ee');
@@ -118,12 +128,12 @@ test('bóveda E2EE: entrega recuperación, conserva el ancla y elimina los datos
     expect(JSON.stringify([...isolated.state.states.values()])).not.toContain('Historia de prueba');
     expect(JSON.stringify([...isolated.state.vaults.values()])).not.toContain('Historia de prueba');
     expect(requests.join('\n')).not.toContain(password);expect(requests.join('\n')).not.toContain(recovery);
-    await page.locator('#show-settings').click();
+    await navigateSection(page,'settings');
     await expect(page.locator('#private-idle-minutes')).toHaveValue('30');await expect(page.locator('#private-background-minutes')).toHaveValue('2');
     await page.locator('#private-idle-minutes').selectOption('60');await page.locator('#private-background-minutes').selectOption('5');
     await expect(page.locator('#private-settings-lock')).toBeEnabled();
     await page.locator('#show-saved').click();await expect(page.locator('#saved-panel')).not.toContainText('Historia de prueba');
-    await page.locator('#show-private').click();await expect(page.locator('#private-gate')).toBeHidden();
+    await navigateSection(page,'private');await expect(page.locator('#private-gate')).toBeHidden();
     await expect(page.locator('#private-library').getByRole('button',{name:'Elegir Historia de prueba',exact:true})).toBeVisible();
     await page.locator('#private-library').getByRole('button',{name:'Continuar Historia de prueba',exact:true}).click();
     await expect(page.locator('#page-position')).toContainText('Imagen 2 de 6');
@@ -150,7 +160,7 @@ test('bóveda E2EE: entrega recuperación, conserva el ancla y elimina los datos
 test('bóveda: pausa breve conserva la sesión, plazo vencido bloquea y recargar conserva solo los tiempos',async({page})=>{
   const isolated=await startAccountDemo({apiPort:0,webPort:0}),password='Contraseña ficticia para la prueba de sesión 93';
   try{
-    await page.clock.install();await page.goto(isolated.web+'?qa_user=none');await page.locator('#show-private').click();
+    await page.clock.install();await page.goto(isolated.web+'?qa_user=none');await navigateSection(page,'private');
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);await page.getByRole('textbox',{name:'Repite tu contraseña',exact:true}).fill(password);
     await page.getByRole('button',{name:'Crear bóveda cifrada',exact:true}).click();await page.getByRole('button',{name:'Ya guardé mi clave',exact:true}).click();
     await expect(page.locator('#private-gate')).toBeHidden();
@@ -158,11 +168,11 @@ test('bóveda: pausa breve conserva la sesión, plazo vencido bloquea y recargar
     await expect(page.locator('body')).toHaveClass(/vault-background-hidden/);await page.clock.fastForward(60000);
     await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'));});
     await expect(page.locator('body')).not.toHaveClass(/vault-background-hidden/);await expect(page.locator('#private-gate')).toBeHidden();
-    await page.locator('#show-settings').click();await page.locator('#private-background-minutes').selectOption('1');await page.locator('#private-idle-minutes').selectOption('15');await page.locator('#show-private').click();
+    await navigateSection(page,'settings');await page.locator('#private-background-minutes').selectOption('1');await page.locator('#private-idle-minutes').selectOption('15');await navigateSection(page,'private');
     await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'));});await page.clock.fastForward(61000);
     await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'));});await expect(page.locator('#private-gate')).toBeVisible();
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);await page.getByRole('button',{name:'Desbloquear',exact:true}).click();await expect(page.locator('#private-gate')).toBeHidden();
-    await page.reload();await expect(page.locator('#private-gate')).toBeVisible();await page.locator('#show-settings').click();await expect(page.locator('#private-background-minutes')).toHaveValue('1');await expect(page.locator('#private-idle-minutes')).toHaveValue('15');await expect(page.locator('#private-settings-lock')).toBeDisabled();
+    await page.reload();await expect(page.locator('#private-gate')).toBeVisible();await navigateSection(page,'settings');await expect(page.locator('#private-background-minutes')).toHaveValue('1');await expect(page.locator('#private-idle-minutes')).toHaveValue('15');await expect(page.locator('#private-settings-lock')).toBeDisabled();
   }finally{await isolated.close();}
 });
 
@@ -172,8 +182,8 @@ test('invitado: guarda lectura local, conserva ancla y permite volver sin cuenta
   await page.goto(localDemo.web+'?qa_user=none');
   await page.locator('#add-toggle').click();await page.locator('#series-url').fill(localDemo.api+'/qa/manga');
   await page.locator('#add-series').click();await expect(page.locator('#chapter-controls')).toBeVisible();
-  await expect(page.locator('#chapter-select')).toBeEnabled();await page.locator('#chapter-select').selectOption({index:2});
-  await page.locator('#open-chapter').click();await expect(page.locator('#pages')).toHaveAttribute('aria-busy','false');
+  await expect(page.locator('#chapter-browser .chapter-row')).toHaveCount(3);
+  await page.locator('#chapter-browser .chapter-row').nth(1).click();await expect(page.locator('#pages')).toHaveAttribute('aria-busy','false');
   await page.locator('#reader-options-toggle').click();await page.locator('#reading-mode').selectOption('paged');
   await page.locator('#page-forward').click();await page.locator('#page-forward').click();
   await expect(page.locator('#page-position')).toContainText('Imagen 3 de 6');
@@ -255,9 +265,9 @@ test('Solo nuevas: recuerda fichas entre sesiones, permite recuperarlas y no cam
     await page.goto(isolated.web+'?qa_user=b#discover');await expect(page.locator('#recommend-results .series-card')).toHaveCount(24);
     const choice=page.locator('#recommend-results .series-choice').first(),label=await choice.getAttribute('aria-label');await choice.click();
     await expect(page.locator('#rec-seen-status')).toContainText('Ficha recordada');await page.getByRole('button',{name:'Cerrar vista previa',exact:true}).click();
-    await page.locator('#rec-only-new').check();await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
+    await revealResultOptions(page);await page.locator('#rec-only-new').check();await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
     await page.reload();await expect(page.locator('#rec-only-new')).toBeChecked();await expect(page.locator('#recommend-results .series-card')).toHaveCount(24);await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
-    await page.locator('#rec-reset-seen').click();await expect(page.locator('#rec-seen-status')).toContainText('Historial de vistas reiniciado');await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
+    await revealResultOptions(page);await page.locator('#rec-reset-seen').click();await expect(page.locator('#rec-seen-status')).toContainText('Historial de vistas reiniciado');await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
     await page.locator('#show-saved').click();await expect(page.locator('#series-grid .series-card')).toHaveCount(0);
   }finally{await isolated.close();}
 });
