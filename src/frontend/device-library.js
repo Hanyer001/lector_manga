@@ -76,7 +76,8 @@ export function createDeviceLibrary({transport,storage=openDeviceStorage(),openS
       let filters=ranking.filters;
       if(!filters.genres.length&&!filters.themes.length){const tags=recommendationQueryTags(seeds);filters={...filters,genres:tags.filter(t=>t.kind==='genres').slice(0,3).map(t=>t.key),themes:tags.filter(t=>t.kind==='themes').slice(0,2).map(t=>t.key)};}
       const data=await send(route,{mode:'genres',filters,refresh:body.refresh,pages:body.pages},options);
-      return {...data,mode:body.mode,personalized:seeds.length>0,results:rankRecommendations(data.results,{...ranking,limit:120})};
+      const results=rankRecommendations(data.results,{...ranking,limit:120});
+      return {...data,mode:body.mode,personalized:seeds.some(seed=>seed.genres?.length||seed.themes?.length||seed.authors?.length),results,sources:(data.sources??[]).map(source=>({...source,count:results.filter(item=>item.source===source.id).length}))};
     }
     if(work){const id=Number(work[1]),action=work[2];
       if(!action){const value=db.getWork(id);return {...value,editions:await decorate(value.editions,options)};}

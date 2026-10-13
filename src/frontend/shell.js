@@ -182,17 +182,18 @@ export function createShell({ preview, api, state, navigate, select, resume, add
   $('source-hub').addEventListener('change',()=>{$('search-source').value='selected';scheduleSearch();});
   async function update() {
     const generation=++updateGeneration;
-    const [folderData,updateData]=await Promise.all([api('/api/folders'),api('/api/updates')]);
+    const lockedPrivate=state().view==='private'&&!state().privateUnlocked;
+    const [folderData,updateData]=await Promise.all([lockedPrivate?[]:api('/api/folders'),api('/api/updates')]);
     if(generation!==updateGeneration)return;
     folders=folderData;updates=updateData;
-    fill('folder-filter',folders.map(f=>({id:f.id,name:`${f.name} (${f.count})`})),'Todas las historias');
+    if(state().view!=='private')fill('folder-filter',folders.map(f=>({id:f.id,name:`${f.name} (${f.count})`})),'Todas las historias');
     fill('genre-filter',[...[...new Set(state().series.filter(item=>!item.is_private).flatMap(item=>item.genres??[]))].sort(),{id:'adult',name:'+18'}],'Todos los géneros',true);
     fill('author-filter',[...new Set(state().series.filter(item=>!item.is_private).flatMap(item=>item.authors??[]))].sort(),'Todos los autores',true);
     renderSources();renderFolders();renderHome();renderChips();
     await discovery.update();
     for(const group of searchGroups)renderSearchGroup(group);
   }
-  return { update,organize,renderHome,renderChips,clearFilters,enterDiscover:()=>discovery.activate(),clearDiscovery:()=>discovery.clear(),search:()=>{clearTimeout(searchTimer);return search();},hasFavorite,
+  return { folders:()=>folders,update,organize,renderHome,renderChips,clearFilters,enterDiscover:()=>discovery.activate(),clearDiscovery:()=>discovery.clear(),search:()=>{clearTimeout(searchTimer);return search();},hasFavorite,
     clearPrivate(){updateGeneration++;selectedItem=undefined;metadataOriginal=undefined;folders=[];folderEditing=undefined;for(const id of ['folder-list','series-folders'])$(id).replaceChildren();for(const id of ['folder-name','series-genres','series-authors','series-themes','edition-url']){const input=$(id);if(input)input.value='';}fill('folder-filter',[],'Todas las historias');},
     clearSearch(){searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();},
     cancelSearch(){searchAbort?.abort();searchGeneration++;},

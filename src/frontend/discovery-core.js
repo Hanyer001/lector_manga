@@ -97,7 +97,10 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
     }
     if(mode==='similar'&&!best)continue;
     if(mode==='recent'&&(!informative||!best))continue;
-    if(mode==='personal'&&informative&&!best)continue;
+    // Los filtros elegidos también sirven para explorar. La afinidad se indica
+    // por separado: una clasificación +18 no equivale a un gusto personal.
+    const filterMatch=mode==='personal'&&informative&&!best&&Boolean(filters.genres?.length||filters.themes?.length);
+    if(mode==='personal'&&informative&&!best&&!filterMatch)continue;
     if(['personal','recent'].includes(mode)&&negative.some(seed=>{const match=affinity(item,seed);return match.strong&&match.score>(bestMatch?.score??0);}))continue;
     if(bestSeed){const shared=bestMatch.shared.slice().sort((a,b)=>(features(bestSeed).get(b)??0)-(features(bestSeed).get(a)??0)).slice(0,3).map(tagLabel);
       reason=`${mode==='similar'?'Similar a':mode==='recent'?'Por tu lectura de':bestSeed.sentiment==='like'||bestSeed.rating>=8?'Porque te gustó':'Por tu biblioteca de'} ${bestSeed.titulo??bestSeed.title}${shared.length?`: ${shared.join(', ')}`:''}${bestMatch.authors.length?' · comparte autor':''}.`;}
@@ -105,7 +108,8 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
     const matchedFilters=[...(filters.genres??[]).filter(value=>keys(item.genres).has(tagKey(value))),...(filters.themes??[]).filter(value=>keys(item.themes).has(tagKey(value)))].map(tagLabel);
     if(filters.genres?.length||filters.themes?.length) {score+=5;if(!bestSeed&&mode!=='diverse')reason=`Coincide con tus filtros: ${matchedFilters.join(', ')||'clasificación del catálogo'}.`;}
     if(mode==='personal'&&(own?.more_like||own?.sentiment==='like'))score+=3;
-    ranked.push({...item,score,reason,explanation:{mode,seedTitle:bestSeed?.titulo??bestSeed?.title??null,sharedTags:(bestMatch?.shared??[]).map(tagLabel),sharedAuthors:bestMatch?.authors??[],matchedFilters}});
+    if(filterMatch)reason='Por tus filtros · todavía sin afinidad confirmada con tus lecturas.';
+    ranked.push({...item,score,reason,discoveryMatch:filterMatch?'filters':bestSeed?'affinity':'catalog',explanation:{mode,seedTitle:bestSeed?.titulo??bestSeed?.title??null,sharedTags:(bestMatch?.shared??[]).map(tagLabel),sharedAuthors:bestMatch?.authors??[],matchedFilters}});
   }
   ranked.sort((a,b)=>b.score-a.score||normalizeTag(a.title).localeCompare(normalizeTag(b.title)));
   // Intercala los mejores resultados de cada catálogo. Ninguna fuente monopoliza la primera fila.
