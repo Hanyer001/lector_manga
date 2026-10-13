@@ -146,7 +146,11 @@ export function createLibraryTransfer(db, openDatabase) {
           }
         }
         const oldPreferences = db.prepare('SELECT value_json FROM DiscoveryPreferences WHERE id=1').get().value_json;
-        if (oldPreferences === '{}') db.prepare('UPDATE DiscoveryPreferences SET value_json=? WHERE id=1').run(rows.DiscoveryPreferences[0].value_json);
+        if (oldPreferences === '{}') {
+          const preferences=JSON.parse(rows.DiscoveryPreferences[0].value_json);
+          preferences.favoriteWorkIds=(preferences.favoriteWorkIds??[]).map(id=>workMap.get(id)).filter(Boolean);
+          db.prepare('UPDATE DiscoveryPreferences SET value_json=? WHERE id=1').run(JSON.stringify(preferences));
+        }
         for (const row of rows.RecommendationFeedback) db.prepare('INSERT OR IGNORE INTO RecommendationFeedback VALUES(?,?,?,?)').run(row.item_key, row.item_json, row.feedback_json, row.updated_at);
         db.prepare('DELETE FROM Works WHERE NOT EXISTS(SELECT 1 FROM Series WHERE work_id=Works.id)').run();
         return { imported: true, ...counts };
