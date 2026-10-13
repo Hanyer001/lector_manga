@@ -59,7 +59,8 @@ export function mountDiscovery(app,{database,sources,consult,withCover,sourceTim
     if(stream){res.set('Content-Type','application/x-ndjson; charset=utf-8');res.set('X-Accel-Buffering','no');res.flushHeaders();send('start',{results:[],sources:selected.map(([id,source])=>({id,name:source.name??id,status:'pending',messages:[],count:0})),mode,elapsedMs:Date.now()-started});}
     // Completa las etiquetas faltantes para recomendar sin alterar la biblioteca.
     // La caché contiene solo metadatos en RAM y dura diez minutos.
-    const metadataRows=mode==='genres'||mode==='diverse'?[]:library.filter(row=>(!row.genres?.length&&!row.themes?.length||mode==='similar'&&!row.themes?.length)&&(!seedWorkId||row.work_id===seedWorkId)&&(!seedFeedbackKey)&&(!(mode==='recent')||row.ultima_lectura)&&(mode==='similar'||row.reading_state!=='abandoned'&&row.sentiment!=='dislike')).sort((a,b)=>(b.ultima_lectura??0)-(a.ultima_lectura??0)).slice(0,3);
+    const favorites=new Set(mode==='personal'?filters.favoriteWorkIds:[]);
+    const metadataRows=mode==='genres'||mode==='diverse'?[]:library.filter(row=>(!row.genres?.length&&!row.themes?.length||mode==='similar'&&!row.themes?.length)&&(!seedWorkId||row.work_id===seedWorkId)&&(!seedFeedbackKey)&&(!(mode==='recent')||row.ultima_lectura)&&(mode==='similar'||row.reading_state!=='abandoned'&&row.sentiment!=='dislike')).sort((a,b)=>Number(favorites.has(b.work_id))-Number(favorites.has(a.work_id))||(b.ultima_lectura??0)-(a.ultima_lectura??0)).slice(0,3);
     await Promise.all(metadataRows.map(async row=>{
       const editionSource=sources.get(row.source);if(!editionSource?.capabilities?.manga||editionSource.enabled===false)return;
       const key=itemKey(row),cached=metadataCache.get(key);
@@ -99,7 +100,7 @@ export function mountDiscovery(app,{database,sources,consult,withCover,sourceTim
       const requests=source.recommendationCatalogOnly?[{adult}]:sourceQueries;
       await Promise.all(requests.map(async query=>{if(signal.aborted)return;try{
         const options={...query,page:pages?.[id]??0,adult,genres:(query.genres??[]).filter(genre=>tagKey(genre)!=='adult'),excludeGenres:(query.excludeGenres??[]).filter(genre=>tagKey(genre)!=='adult')};
-        const cacheKey=JSON.stringify([id,...['genres','themes','excludeGenres','excludeThemes'].map(key=>(options[key]??[]).map(tagKey).sort()),options.country??'',options.status??'',adult,options.page]);
+        const cacheKey=JSON.stringify([id,...['genres','themes','excludeGenres','excludeThemes'].map(key=>(options[key]??[]).map(tagKey).sort()),options.country??'',options.status??'',options.catalogOrder??'popular',adult,options.page]);
         const {value:result,cached:hit}=await catalogCache(cacheKey,async loadSignal=>{
           const result=await consult({operationSignal:AbortSignal.any([loadSignal,AbortSignal.timeout(budget)])},source,'recommend',options);
           if(!Array.isArray(result.results))throw new ApiError(502,'INVALID_RESPONSE','El catálogo devolvió resultados inválidos.');
