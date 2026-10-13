@@ -46,6 +46,7 @@ test('catálogos: novedades pide creación descendente y terminadas pide el esta
   let manhwaQuery,dexQuery;
   const manhwa=await createScraper('manhwaweb',{maxRetries:0,fetchImpl:async url=>{manhwaQuery=new URL(url);return new Response(JSON.stringify({data:[]}),{headers:{'Content-Type':'application/json'}});}});
   await manhwa.recommend({catalogOrder:'newest',status:'completed'});
+  assert.equal(manhwaQuery.origin,'https://api.manhwaweb.com');
   assert.equal(manhwaQuery.searchParams.get('order_item'),'creacion');assert.equal(manhwaQuery.searchParams.get('estado'),'finalizado');
   const dex=await createScraper('mangadex',{maxRetries:0,fetchImpl:async url=>{dexQuery=new URL(url);return new Response(JSON.stringify({result:'ok',data:[],offset:0,total:0}),{headers:{'Content-Type':'application/json'}});}});
   await dex.recommend({catalogOrder:'newest',status:'completed'});
