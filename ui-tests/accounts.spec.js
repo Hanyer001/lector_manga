@@ -83,7 +83,7 @@ test('importa un respaldo privado de otra cuenta con recuperación y mantiene su
     await expect(page.locator('#account-private-title')).toHaveText('Desbloquea el archivo cifrado');
     await page.locator('#account-private-pin').fill(encrypted.recoveryKey);await page.locator('#account-private-recovery').check();
     await page.locator('#account-private-submit').click();await expect(page.locator('#account-status')).toContainText('Importación completada');
-    await page.getByRole('button',{name:'Privada',exact:true}).click();await page.locator('#private-pin').fill(password);
+    await navigateSection(page,'private');await page.locator('#private-pin').fill(password);
     await page.getByRole('button',{name:'Desbloquear',exact:true}).click();
     await page.locator('#private-library').getByRole('button',{name:'Continuar Historia de prueba',exact:true}).click();
     await expect(page.locator('#page-position')).toContainText('Imagen 2 de 6');
