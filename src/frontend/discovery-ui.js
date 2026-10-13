@@ -2,6 +2,7 @@ import { groupWorks, itemKey, normalizeTag, tagKey, tagLabel } from './discovery
 import { discoveryTags } from './discovery-tags.js';
 import { renderSeriesCards } from './library-view.js';
 import { isPublicReading, isAdult } from './content-policy.js';
+import {createDiscoveryExtras} from './discovery-extras.js';
 const $=id=>document.getElementById(id);
 const text=(tag,value,className='')=>Object.assign(document.createElement(tag),{textContent:value,className});
 export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,beginQuery,endQuery,sourceName}) {
@@ -13,8 +14,22 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
   const captureViewed=()=>{hiddenViewed=new Set([...viewed.values()].flatMap(seenKeys));};
   const hasOpinion=item=>item.hidden||item.already_read||item.more_like||item.rating||item.sentiment&&item.sentiment!=='neutral';
   const tags={genres:new Set(),themes:new Set(),excludeGenres:new Set(),excludeThemes:new Set()};
+  let collection='recommendations';
+  const collectionLabels={recommendations:'Historias para descubrir',newest:'Novedades del catálogo',completed:'Historias terminadas'};
   const availableSources=()=>state().sources.filter(s=>s.enabled&&s.capabilities.recommend&&!s.demo&&(!tags.genres.has('adult')||s.capabilities.adult));
-  const filters=()=>({genres:[...tags.genres],themes:[...tags.themes],excludeGenres:[...tags.excludeGenres],excludeThemes:[...tags.excludeThemes],country:$('rec-country').value,status:$('rec-status').value,minChapters:Number($('rec-min-chapters').value),genreMatch:$('rec-genre-match').value,sources:sourceSelection?[...sourceSelection]:[],onlyNew:$('rec-only-new').checked});
+  const filters=()=>({genres:[...tags.genres],themes:[...tags.themes],excludeGenres:[...tags.excludeGenres],excludeThemes:[...tags.excludeThemes],country:$('rec-country').value,status:collection==='completed'?'completed':$('rec-status').value,minChapters:Number($('rec-min-chapters').value),genreMatch:$('rec-genre-match').value,sources:sourceSelection?[...sourceSelection]:[],onlyNew:$('rec-only-new').checked,catalogOrder:collection==='newest'?'newest':'popular',...extras.preferences()});
+  const extras=createDiscoveryExtras({api,state,filters,search:()=>({collection}),navigate,
+    apply:saved=>{collection=saved.collection;writeFilters(saved.filters);$('rec-only-new').checked=Boolean(saved.filters.onlyNew);drawCollection();changed();recommend();},
+    onFavorites:()=>{modeCache.clear();if(collection==='recommendations'&&$('rec-mode').value==='personal'){changed();recommend();}}});
+  function drawCollection(){
+    for(const button of document.querySelectorAll('[data-rec-collection]'))button.setAttribute('aria-pressed',String(button.dataset.recCollection===collection));
+    $('rec-results-title').textContent=collectionLabels[collection];
+    $('rec-collection-copy').textContent=collection==='newest'?'Incorporaciones recientes de cada catálogo con capítulos disponibles en español. El orden se conserva dentro de cada fuente.':collection==='completed'?'Obras marcadas como finalizadas por su catálogo. La traducción al español puede seguir en curso.':'Explora por tus gustos, tus lecturas o los filtros que elijas.';
+    $('rec-mode-controls').hidden=collection!=='recommendations';
+    $('rec-status').disabled=collection==='completed';
+    $('rec-result-sort').options[0].textContent=collection==='newest'?'Novedades del catálogo':'Afinidad recomendada';
+  }
+  for(const button of document.querySelectorAll('[data-rec-collection]'))button.addEventListener('click',()=>{collection=button.dataset.recCollection;drawCollection();changed();recommend();});
   const changed=()=>{abort();visibleLimit=24;nextPages={};appending=false;results=[];providers=[];phase='idle';lastMessage='';$('recommend-warnings').hidden=true;render();drawSources();$('recommend-reason').textContent=tags.genres.has('adult')?'Género +18 seleccionado · MangaDex y ManhwaWeb. Pulsa Aplicar filtros.':'Filtros preparados. Pulsa Aplicar filtros para actualizar las sugerencias.';};
   const modeDescriptions={personal:'Prioriza coincidencias con tus gustos. Si eliges filtros, también muestra historias para explorar y explica la diferencia.',recent:'Relaciona las cinco historias que has leído más recientemente y da prioridad a la última.',similar:'Busca coincidencias concretas con la obra elegida. Compartir solo Drama o Acción no es suficiente.',genres:'Combina géneros y temas, y excluye lo que prefieras evitar.',diverse:'Busca géneros y temas fuera de tus lecturas habituales, respetando tus filtros.'};
   function drawMode(){const mode=$('rec-mode').value;$('rec-seed-label').hidden=mode!=='similar';$('rec-mode-description').textContent=modeDescriptions[mode];if(mode==='genres')$('rec-customize').open=true;for(const button of document.querySelectorAll('[data-rec-mode]'))button.setAttribute('aria-pressed',String(button.dataset.recMode===mode));}
@@ -91,11 +106,11 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
       if(provider)button.title=(provider.messages??[]).join(' ')||(['pending','loading'].includes(provider.status)?'Consultando este catálogo.':canExplore?`El catálogo devolvió ${provider.candidates} historias; no coinciden con tu perfil o ya están guardadas o descartadas. Pulsa para explorar con tus filtros.`:hasResults?'Historias disponibles de este catálogo.':'Sin resultados con estos filtros en la página consultada.');
       button.addEventListener('click',()=>{if(canExplore)exploreCatalog(id);else{resultSource=id;render();}});container.append(button);
     }
-    const filterMatches=results.filter(item=>item.discoveryMatch==='filters').length,canExplore=$('rec-mode').value==='personal'&&providers.some(provider=>provider.candidates>results.filter(item=>item.source===provider.id).length);
+    const filterMatches=results.filter(item=>item.discoveryMatch==='filters').length,canExplore=collection==='recommendations'&&$('rec-mode').value==='personal'&&providers.some(provider=>provider.candidates>results.filter(item=>item.source===provider.id).length);
     $('recommend-catalog-hint').hidden=!filterMatches&&!canExplore;
     $('recommend-catalog-copy').textContent=filterMatches?`${filterMatches} ${filterMatches===1?'historia coincide':'historias coinciden'} con tus filtros; aún no hay afinidad confirmada con tus lecturas.`:'Los catálogos tienen más historias que las sugerencias personales. Explora por filtros para ampliar la selección.';
   };
-  function exploreCatalog(source='') { if(source)sourceSelection=new Set([source]);$('rec-mode').value='genres';drawMode();changed();recommend(); }
+  function exploreCatalog(source='') { if(source)sourceSelection=new Set([source]);collection='recommendations';drawCollection();$('rec-mode').value='genres';drawMode();changed();recommend(); }
   $('rec-explore-catalog').addEventListener('click',()=>exploreCatalog());
   $('rec-result-query').addEventListener('input',render);$('rec-result-sort').addEventListener('change',render);
   $('rec-only-new').addEventListener('change',async()=>{captureViewed();render();try{await api('/api/discovery',{method:'PUT',body:JSON.stringify(filters())});}catch(error){$('rec-seen-status').textContent=error.message;}});
@@ -105,7 +120,8 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     results=[...new Map([...(appending?baseResults:[]),...result.results].filter(item=>!hasFavorite(item)).map(item=>[itemKey(item),item])).values()];nextPages=result.nextPages??{};providers=result.sources??[];lastMessage=result.message??'';render();
     const contributing=new Set(results.map(item=>item.source)).size,waiting=providers.filter(p=>['pending','loading'].includes(p.status)).length;
     const labels={personal:result.personalized?'Según tus gustos y biblioteca.':'Selección general para empezar.',recent:'A partir de tus lecturas recientes.',similar:'Coincidencias con la historia elegida.',genres:'Según los filtros que elegiste.',diverse:'Para salir de tus lecturas habituales.'};
-    $('recommend-reason').textContent=waiting?`${results.length?`${results.length} historias disponibles · `:''}consultando ${waiting} ${waiting===1?'catálogo':'catálogos'}…`:lastMessage||`${results.length} historias · ${contributing} ${contributing===1?'catálogo':'catálogos'}. ${labels[$('rec-mode').value]}`;
+    const description=collection==='newest'?'Incorporaciones recientes del catálogo.':collection==='completed'?'Finalizadas según su catálogo.':labels[$('rec-mode').value];
+    $('recommend-reason').textContent=waiting?`${results.length?`${results.length} historias disponibles · `:''}consultando ${waiting} ${waiting===1?'catálogo':'catálogos'}…`:lastMessage||`${results.length} historias · ${contributing} ${contributing===1?'catálogo':'catálogos'}. ${description}`;
     $('recommend-warnings').hidden=!result.warnings?.length;$('recommend-warnings-list').replaceChildren(...(result.warnings??[]).map(message=>text('p',message,'small muted')));
   }
   async function recommend(event,{more=false}={}) {
@@ -116,9 +132,9 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     if(more&&!Object.keys(requestedPages).length)return;
     appending=more;baseResults=more?[...results]:[];if(more)visibleLimit=visibleCount+24;else {visibleLimit=24;nextPages={};}
     abort();
-    if($('rec-mode').value==='similar'&&!$('rec-seed').value){$('recommend-reason').textContent='Elige primero una obra guardada para encontrar historias similares.';$('rec-seed').focus();return;}
+    if(collection==='recommendations'&&$('rec-mode').value==='similar'&&!$('rec-seed').value){$('recommend-reason').textContent='Elige primero una obra guardada para encontrar historias similares.';$('rec-seed').focus();return;}
     if(!availableSources().length){$('recommend-reason').textContent='No hay catálogos disponibles para estos filtros.';return;}
-    const preferences=filters(),seedValue=$('rec-seed').value,mode=$('rec-mode').value;
+    const preferences=filters(),seedValue=$('rec-seed').value,mode=collection==='recommendations'?$('rec-mode').value:'genres';
     const seedWorkId=mode==='similar'&&!seedValue.startsWith('feedback:')?Number(seedValue)||null:null,seedFeedbackKey=mode==='similar'&&seedValue.startsWith('feedback:')?seedValue.slice(9):null;
     const cacheKey=JSON.stringify([mode,mode==='similar'?seedValue:'',preferences,profileVersion]),cached=modeCache.get(cacheKey),refresh=event?.currentTarget?.id==='load-recommendations';
     attempted=true;
@@ -161,10 +177,11 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
   let initialized=false;
   async function update() {
     discovery=await api('/api/discovery');
+    extras.update(discovery.preferences);drawCollection();
     viewed.clear();for(const item of discovery.feedback.filter(item=>item.seen))viewed.set(itemKey(item),item);captureViewed();
     const profile=JSON.stringify([state().series.map(({id,work_id,titulo,altTitles,genres,themes,authors,sentiment,rating,reading_state,ultima_lectura,is_private,is_adult})=>({id,work_id,titulo,altTitles,genres,themes,authors,sentiment,rating,reading_state,ultima_lectura,is_private,is_adult})),discovery.feedback.filter(hasOpinion)]);
     if(profile!==profileVersion){modeCache.clear();profileVersion=profile;}
-    if(!initialized){writeFilters(discovery.preferences);$('rec-only-new').checked=Boolean(discovery.preferences.onlyNew);initialized=true;}
+    if(!initialized){collection=discovery.preferences.catalogOrder==='newest'?'newest':'recommendations';writeFilters(discovery.preferences);$('rec-only-new').checked=Boolean(discovery.preferences.onlyNew);initialized=true;drawCollection();}
     const previous=$('rec-seed').value,works=groupWorks(state().series.filter(isPublicReading));
     $('rec-seed').replaceChildren(new Option('Elige una historia',''),...works.map(work=>new Option(work.titulo,work.work_id)),...discovery.feedback.filter(item=>item.more_like||item.sentiment==='like').map(item=>new Option(item.title+' · sugerencia','feedback:'+itemKey(item))));
     if([...$('rec-seed').options].some(o=>o.value===previous))$('rec-seed').value=previous;
@@ -212,5 +229,5 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     event.preventDefault();if(!selected)return;const id=selected.id,workId=selected.work_id;$('edition-add').disabled=true;
     try{await api('/api/series',{method:'POST',body:JSON.stringify({url_origen:$('edition-url').value,work_id:workId})});$('edition-url').value='';await reload();await select(state().series.find(s=>s.id===id));$('edition-status').textContent='Nueva fuente vinculada. Selecciónala y actualiza sus capítulos.';}catch(error){$('edition-status').textContent=error.message;}finally{$('edition-add').disabled=false;}
   });
-  return {update,organize,abort,activate(){if(!attempted&&$('rec-mode').value!=='similar')recommend();},clear(){abort();viewed.clear();hiddenViewed.clear();$('rec-only-new').checked=false;initialized=false;selected=null;transfer=null;modeCache.clear();profileVersion='';attempted=false;phase='idle';results=[];providers=[];$('rec-result-query').value='';$('recommend-warnings').hidden=true;$('recommend-warnings-list').replaceChildren();render();$('recommend-feedback-list').replaceChildren();$('recommend-reason').textContent='Elige tus géneros o descubre historias a partir de tus lecturas.';}};
+  return {update,organize,abort,activate(){if(!attempted&&(collection!=='recommendations'||$('rec-mode').value!=='similar'))recommend();},clear(){abort();extras.clear();collection='recommendations';drawCollection();viewed.clear();hiddenViewed.clear();$('rec-only-new').checked=false;initialized=false;selected=null;transfer=null;modeCache.clear();profileVersion='';attempted=false;phase='idle';results=[];providers=[];$('rec-result-query').value='';$('recommend-warnings').hidden=true;$('recommend-warnings-list').replaceChildren();render();$('recommend-feedback-list').replaceChildren();$('recommend-reason').textContent='Elige tus géneros o descubre historias a partir de tus lecturas.';}};
 }

@@ -51,7 +51,18 @@
     </section>
     <section id="discover-panel" aria-label="Descubrir" hidden>
       <div class="discovery-heading"><p class="muted">Combina tus gustos con historias de distintos catálogos en español.</p><span id="discover-catalog-count" class="discovery-catalog-count"></span></div>
+      <div class="discovery-collections" role="group" aria-label="Secciones de Descubrir">
+        <button type="button" class="discovery-collection" data-rec-collection="recommendations" aria-pressed="true"><strong>Para descubrir</strong><span>Tus gustos y filtros</span></button>
+        <button type="button" class="discovery-collection" data-rec-collection="newest" aria-pressed="false"><strong>Novedades</strong><span>Recién añadidas al catálogo</span></button>
+        <button type="button" class="discovery-collection" data-rec-collection="completed" aria-pressed="false"><strong>Terminadas</strong><span>Historias con final</span></button>
+      </div>
+      <p id="rec-collection-copy" class="small muted">Explora por tus gustos, tus lecturas o los filtros que elijas.</p>
+      <div id="discovery-personal-tools" class="discovery-personal-tools">
+        <details id="rec-favorites-panel"><summary>Mis tres favoritos <span id="rec-favorite-count" class="small muted">0 de 3 elegidos</span></summary><p class="small muted">Elige hasta tres obras de tu biblioteca general. Tendrán más peso en «Para ti» y podrás cambiarlas cuando quieras.</p><form id="rec-favorite-form"><div class="discovery-favorite-fields"><label for="rec-favorite-1">Favorito 1<select id="rec-favorite-1"></select></label><label for="rec-favorite-2">Favorito 2<select id="rec-favorite-2"></select></label><label for="rec-favorite-3">Favorito 3<select id="rec-favorite-3"></select></label></div><button id="rec-favorite-save" class="button" type="submit">Guardar favoritos</button></form><div id="rec-favorite-empty" hidden><p class="small muted">Añade historias a tu biblioteca para elegir tus favoritos.</p><button id="rec-favorite-library" class="button subtle" type="button">Ir a mi biblioteca</button></div></details>
+        <details id="rec-searches-panel"><summary>Búsquedas guardadas <span id="rec-saved-count" class="small muted">0 guardadas</span></summary><div id="rec-saved-searches" class="tag-chips"></div><form id="rec-save-search-form" class="saved-search-form"><label for="rec-search-name">Guardar los filtros actuales<input id="rec-search-name" type="text" maxlength="40" placeholder="Ej.: Fantasía terminada" required></label><button class="button" type="submit">Guardar búsqueda</button></form><p class="small muted">Hasta doce combinaciones. Usa el mismo nombre para actualizar una.</p></details>
+      </div><p id="rec-personal-status" class="small muted" role="status" aria-live="polite"></p>
       <form id="recommend-form" class="discovery-form">
+        <div id="rec-mode-controls">
         <label class="discovery-mode-select" for="rec-mode">Descubrir según<select id="rec-mode"><option value="personal">Mis gustos y favoritos</option><option value="recent">Mis últimas lecturas</option><option value="similar">Una obra concreta</option><option value="genres">Géneros y temas elegidos</option><option value="diverse">Algo diferente</option></select></label>
         <div class="discovery-modes" role="group" aria-label="Cómo quieres descubrir">
           <button class="discovery-mode" type="button" data-rec-mode="personal" aria-pressed="true"><span class="mode-symbol" aria-hidden="true">✦</span><span><strong>Para ti</strong><small>Tus gustos y favoritos</small></span></button>
@@ -62,7 +73,7 @@
         </div>
         <p id="rec-mode-description" class="small muted">Historias elegidas según tus favoritos y valoraciones.</p>
         <label id="rec-seed-label" class="discovery-seed" hidden>Similar a<select id="rec-seed"><option value="">Elige una historia</option></select></label>
-        <details id="rec-customize" class="discovery-customize"><summary>Personalizar búsqueda <span id="rec-filter-summary" class="small muted">Catálogos, géneros y filtros</span></summary>
+        </div><details id="rec-customize" class="discovery-customize"><summary>Personalizar búsqueda <span id="rec-filter-summary" class="small muted">Catálogos, géneros y filtros</span></summary>
         <div class="discovery-filter-layout">
         <fieldset class="discovery-sources"><legend>Catálogos <span class="small muted">· elige dónde descubrir</span></legend><div id="rec-sources" class="tag-chips" aria-label="Fuentes de recomendaciones"></div></fieldset>
         <div class="discovery-genres"><span class="discovery-label">¿Qué te apetece leer?</span><div id="rec-quick-genres" class="tag-chips" aria-label="Géneros destacados"></div></div>
@@ -82,7 +93,7 @@
         <div id="rec-selected-tags" class="tag-chips selected-tags" aria-label="Tus filtros activos" hidden></div>
 
       </form>
-      <div class="discovery-results-heading"><div><h2>Historias para descubrir <span id="recommend-count" class="discovery-result-count">0</span></h2><p id="recommend-reason" class="small muted" role="status" aria-live="polite">Elige tus gustos para empezar.</p></div><button id="load-recommendations" class="button subtle" type="button">Actualizar ↻</button></div>
+      <div class="discovery-results-heading"><div><h2><span id="rec-results-title">Historias para descubrir</span> <span id="recommend-count" class="discovery-result-count">0</span></h2><p id="recommend-reason" class="small muted" role="status" aria-live="polite">Elige tus gustos para empezar.</p></div><button id="load-recommendations" class="button subtle" type="button">Actualizar ↻</button></div>
       <details id="discovery-result-options" class="discovery-result-options"><summary>Filtrar y ordenar resultados</summary><div class="discovery-seen-tools"><label><input id="rec-only-new" type="checkbox"> Solo nuevas · ocultar fichas ya abiertas</label><button id="rec-reset-seen" class="button subtle" type="button">Volver a mostrar las vistas</button><span id="rec-seen-status" class="small muted" role="status"></span></div>
       <div id="recommend-tools" class="discovery-result-tools" hidden><label class="sr-only" for="rec-result-query">Buscar en las recomendaciones</label><input id="rec-result-query" type="search" maxlength="200" placeholder="Buscar entre estas historias…"><label class="sr-only" for="rec-result-sort">Ordenar recomendaciones</label><select id="rec-result-sort"><option value="affinity">Afinidad recomendada</option><option value="title">Título · A–Z</option><option value="source">Por catálogo</option></select></div>
       </details><div id="recommend-source-results" class="recommend-source-results tag-chips" aria-label="Resultados por catálogo" hidden></div><div id="recommend-catalog-hint" class="discovery-catalog-hint" hidden><p id="recommend-catalog-copy" class="small muted"></p><button id="rec-explore-catalog" class="button subtle" type="button">Explorar solo por mis filtros</button></div>

@@ -1,4 +1,5 @@
 import { discoveryTags } from './discovery-tags.js';
+import { isPublicReading } from './content-policy.js';
 // Compartido por el servidor y la interfaz. No necesita imágenes ni servicios de IA.
 export const normalizeTag = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 const aliases = {
@@ -47,17 +48,18 @@ const genreWeights={action:.6,adventure:.7,drama:.35,fantasy:1,comedy:.8,romance
 const features=item=>new Map([...(item.genres??[]).map(value=>[tagKey(value),genreWeights[tagKey(value)]??1.2]),...(item.themes??[]).map(value=>[tagKey(value),['school life','magic'].includes(tagKey(value))?1.3:2.4])].filter(([key])=>key!=='adult'));
 const titleKey=value=>normalizeTag(value).replace(/\s*\(\s*\d{4}\s*\)\s*$/,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const usable=seed=>seed.sentiment!=='dislike'&&!seed.hidden&&seed.reading_state!=='abandoned'&&!(seed.rating&&seed.rating<=4);
-export function selectRecommendationSeeds({library=[],feedback=[],mode='personal',seedWorkId=null,seedFeedbackKey=null}={}){
-  const works=groupWorks(library);
+export function selectRecommendationSeeds({library=[],feedback=[],mode='personal',seedWorkId=null,seedFeedbackKey=null,filters={}}={}){
+  const works=groupWorks(library).filter(work=>!work.editions.some(edition=>edition.is_private));
   if(mode==='genres')return [];
   if(mode==='similar')return seedFeedbackKey?feedback.filter(item=>itemKey(item)===seedFeedbackKey):works.filter(item=>String(item.work_id)===String(seedWorkId));
   const seeds=works.filter(usable);
   if(mode==='recent')return seeds.filter(item=>item.ultima_lectura).sort((a,b)=>b.ultima_lectura-a.ultima_lectura).slice(0,5);
-  return [...seeds,...feedback.filter(item=>usable(item)&&(item.sentiment==='like'||item.more_like))];
+  const favorites=new Set(filters.favoriteWorkIds??[]);
+  return [...seeds.map(seed=>({...seed,discoveryFavorite:mode==='personal'&&favorites.has(seed.work_id)&&isPublicReading(seed)})),...feedback.filter(item=>usable(item)&&(item.sentiment==='like'||item.more_like))];
 }
 export function recommendationQueryTags(seeds){
   const totals=new Map();
-  for(const seed of seeds){const weight=seed.more_like?4:seed.sentiment==='like'||seed.rating>=8?3:seed.ultima_lectura?1:.35;
+  for(const seed of seeds){const weight=seed.discoveryFavorite?6:seed.more_like?4:seed.sentiment==='like'||seed.rating>=8?3:seed.ultima_lectura?1:.35;
     for(const [key,value] of features(seed)){const kind=keys(seed.themes).has(key)?'themes':'genres',id=kind+'|'+key;totals.set(id,{kind,key,weight:(totals.get(id)?.weight??0)+value*weight});}}
   return [...totals.values()].sort((a,b)=>b.weight-a.weight||a.key.localeCompare(b.key)).slice(0,3);
 }
@@ -78,7 +80,7 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
   const savedTitles=new Set(library.flatMap(item=>[item.titulo,...(item.altTitles??[])]).map(titleKey));
   const blockedTitles=new Set(feedback.filter(x=>x.hidden||x.already_read||x.sentiment==='dislike').flatMap(x=>[x.title,...(x.altTitles??[])]).map(titleKey));
   const external=new Map(feedback.map(x=>[itemKey(x),x]));
-  const seeds=selectRecommendationSeeds({library,feedback,mode,seedWorkId,seedFeedbackKey});
+  const seeds=selectRecommendationSeeds({library,feedback,mode,seedWorkId,seedFeedbackKey,filters});
   const informative=seeds.some(seed=>features(seed).size||seed.authors?.length);
   const negative=[...works,...feedback].filter(seed=>seed.sentiment==='dislike'||seed.reading_state==='abandoned'||seed.rating&&seed.rating<=4);
   if(mode==='similar')for(const seed of seeds)blockedTitles.add(titleKey(seed.titulo??seed.title));
@@ -90,7 +92,7 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
     let score=0,best=0,bestMatch=null,bestSeed=null,reason='Descubre una historia fuera de tu biblioteca.';
     for(const [index,seed] of seeds.entries()) {
       const match=affinity(item,seed),eligible=mode==='similar'?match.strong:match.related;
-      const weight=mode==='similar'?1:mode==='recent'?1/(1+index*.35):seed.more_like?3:seed.sentiment==='like'||seed.rating>=8?2.5:seed.ultima_lectura?1:.35;
+      const weight=mode==='similar'?1:mode==='recent'?1/(1+index*.35):seed.discoveryFavorite?5:seed.more_like?3:seed.sentiment==='like'||seed.rating>=8?2.5:seed.ultima_lectura?1:.35;
       const similarity=eligible?match.score*weight:0;
       score+=similarity;
       if(similarity>best){best=similarity;bestMatch=match;bestSeed=seed;}
@@ -103,7 +105,7 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
     if(mode==='personal'&&informative&&!best&&!filterMatch)continue;
     if(['personal','recent'].includes(mode)&&negative.some(seed=>{const match=affinity(item,seed);return match.strong&&match.score>(bestMatch?.score??0);}))continue;
     if(bestSeed){const shared=bestMatch.shared.slice().sort((a,b)=>(features(bestSeed).get(b)??0)-(features(bestSeed).get(a)??0)).slice(0,3).map(tagLabel);
-      reason=`${mode==='similar'?'Similar a':mode==='recent'?'Por tu lectura de':bestSeed.sentiment==='like'||bestSeed.rating>=8?'Porque te gustó':'Por tu biblioteca de'} ${bestSeed.titulo??bestSeed.title}${shared.length?`: ${shared.join(', ')}`:''}${bestMatch.authors.length?' · comparte autor':''}.`;}
+      reason=`${mode==='similar'?'Similar a':mode==='recent'?'Por tu lectura de':bestSeed.discoveryFavorite?'Por tu favorito':bestSeed.sentiment==='like'||bestSeed.rating>=8?'Porque te gustó':'Por tu biblioteca de'} ${bestSeed.titulo??bestSeed.title}${shared.length?`: ${shared.join(', ')}`:''}${bestMatch.authors.length?' · comparte autor':''}.`;}
     if(mode==='diverse'){const novelty=[...features(item).keys()].filter(key=>!seeds.some(seed=>features(seed).has(key)));score=novelty.length*5-Math.max(0,...seeds.map(seed=>affinity(item,seed).score));reason=novelty.length?`Para salir de lo habitual: ${novelty.slice(0,3).map(tagLabel).join(', ')}.`:'Una alternativa a tus lecturas habituales.';}
     const matchedFilters=[...(filters.genres??[]).filter(value=>keys(item.genres).has(tagKey(value))),...(filters.themes??[]).filter(value=>keys(item.themes).has(tagKey(value)))].map(tagLabel);
     if(filters.genres?.length||filters.themes?.length) {score+=5;if(!bestSeed&&mode!=='diverse')reason=`Coincide con tus filtros: ${matchedFilters.join(', ')||'clasificación del catálogo'}.`;}
@@ -111,7 +113,8 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
     if(filterMatch)reason='Por tus filtros · todavía sin afinidad confirmada con tus lecturas.';
     ranked.push({...item,score,reason,discoveryMatch:filterMatch?'filters':bestSeed?'affinity':'catalog',explanation:{mode,seedTitle:bestSeed?.titulo??bestSeed?.title??null,sharedTags:(bestMatch?.shared??[]).map(tagLabel),sharedAuthors:bestMatch?.authors??[],matchedFilters}});
   }
-  ranked.sort((a,b)=>b.score-a.score||normalizeTag(a.title).localeCompare(normalizeTag(b.title)));
+  const position=new Map(candidates.map((item,index)=>[itemKey(item),index]));
+  ranked.sort((a,b)=>mode==='genres'&&filters.catalogOrder==='newest'?position.get(itemKey(a))-position.get(itemKey(b)):b.score-a.score||normalizeTag(a.title).localeCompare(normalizeTag(b.title)));
   // Intercala los mejores resultados de cada catálogo. Ninguna fuente monopoliza la primera fila.
   const buckets=new Map();
   for(const item of ranked){if(!buckets.has(item.source))buckets.set(item.source,[]);buckets.get(item.source).push(item);}
