@@ -3,6 +3,8 @@ import {libraryProgress,publicationLabels} from './library-progress.js';
 import {tagLabel} from './discovery-core.js';
 import { renderSeriesCards, setGridLoading } from './library-view.js';
 import { enhanceSelects, syncSelectControls } from './ui-controls.js';
+import { initializeDialog, createDetailTabs } from './dialog-ui.js';
+import { changeView } from './view-transitions.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
 import { readRecommendationStream } from './discovery-stream.js';
@@ -45,6 +47,9 @@ let readerScrollY = 0;
 let readerPoint = null;
 const dialogOrigins = new Map();
 const dialogs = ['add-panel','chapter-controls','folder-panel','more-panel'];
+const detailTabs=createDetailTabs();
+let pickedWorkKey;
+for(const id of dialogs)initializeDialog($(id),{onClose:()=>syncDialogState(id,false)});
 const chapterBrowser = createChapterBrowser($('chapter-browser'), {onChoose: chapter => openChapter(chapter.id)});
 let pickedChapterId = null;
 $('picked-read').addEventListener('click', () => { if (pickedChapterId != null) openChapter(pickedChapterId); });
@@ -55,7 +60,7 @@ $('more-account').addEventListener('click', () => { setDialog('more-panel', fals
 for (const button of document.querySelectorAll('[data-welcome]')) button.addEventListener('click', () => {
   if(button.dataset.welcome==='add'){
     if($('add-toggle').disabled)return;
-    $('add-toggle').click();dialogOrigins.set('add-panel',button);
+    openAddDialog(button);
   }else navigateView(button.dataset.welcome);
 });
 let shell;
@@ -111,13 +116,18 @@ async function api(path, options = {}) {
 function notice(message = '') {
   for (const id of ['notice', 'home-notice']) { $(id).textContent = message; $(id).hidden = !message; }
 }
-function setLibrary(open, { opening = false } = {}) {
+function setLibrary(open, options = {}) {
+  if($('library').hidden===!open){applyLibrary(open,options);return Promise.resolve();}
+  return changeView(()=>applyLibrary(open,options),{privateView:activeView==='private'||Boolean(current?.privateReading)});
+}
+function applyLibrary(open, { opening = false } = {}) {
   const wasOpen = !$('library').hidden;
   if (open && !wasOpen) {
     if (document.body.classList.contains('focus-mode')) focusMode(false);
     flushProgress(); readerScrollY = window.scrollY; readerPoint = anchor();
   } else if (!open && wasOpen) libraryScrollY = window.scrollY;
   $('library').hidden = !open;
+  $('reader').classList.toggle('view-enter',!open);
   document.querySelector('.skip-link').setAttribute('href', open ? '#library' : '#reader');
   document.body.classList.toggle('library-open', open);
   const navigation=document.querySelector('nav[aria-label="Navegación principal"]');
@@ -143,21 +153,22 @@ function setLibrary(open, { opening = false } = {}) {
 
 function setDialog(id, open) {
   const panel = $(id);
-  if (panel.hidden === !open) return;
+  if (panel.open === open) return;
   if (open) {
     for (const other of dialogs) if (other !== id) setDialog(other, false);
     dialogOrigins.set(id, document.activeElement);
   }
-  panel.hidden = !open;
-  const modalOpen = dialogs.some(id => !$(id).hidden);
+  if(open){panel.hidden=false;panel.showModal();}else panel.close();
+  syncDialogState(id,open);
+  if(open)(id==='add-panel'?$('series-url'):id==='folder-panel'?$('folder-name'):id==='more-panel'?$('more-close'):$('picker-close')).focus({preventScroll:true});
+}
+function syncDialogState(id,open) {
+  $(id).hidden=!open;
+  const modalOpen = dialogs.some(id => $(id).open);
   document.body.classList.toggle('modal-open', modalOpen);
-  document.querySelector('.topbar').inert = modalOpen;
-  $('reader').inert = modalOpen;
-  for (const child of $('library').children) if (!dialogs.includes(child.id)) child.inert = modalOpen;
   if (id === 'add-panel') $('add-toggle').setAttribute('aria-expanded', String(open));
   if (id === 'more-panel') $('show-more').setAttribute('aria-expanded', String(open));
-  if (open) (id === 'add-panel' ? $('series-url') : id === 'folder-panel' ? $('folder-name') : id === 'more-panel' ? $('more-close') : $('picker-close')).focus({ preventScroll: true });
-  else dialogOrigins.get(id)?.focus({ preventScroll: true });
+  if(!open&&!modalOpen){const origin=dialogOrigins.get(id);if(origin?.isConnected&&origin.getClientRects().length)origin.focus({preventScroll:true});}
 }
 
 function saveCache() {
@@ -495,7 +506,8 @@ async function openChapter(id,{trial=null}={}) {
   pageIndex=0;pageFraction=0;document.body.classList.remove('reader-paged','reader-active');readerUI.activate(false);
   dirty = false;
   restoring = true;
-  setLibrary(false, { opening: true });
+  await setLibrary(false, { opening: true });
+  if(signal.aborted)return;
   restoring = true;
   $('welcome').hidden = true;
   $('chapter-end').hidden = true;
@@ -563,6 +575,7 @@ async function openChapter(id,{trial=null}={}) {
     observePages();
     updatePosition();
     readerUI.activate(true);
+    readerUI.showTouchGuide();
     dirty=true;flushProgress();
   } catch (error) {
     if (signal.aborted) return;
@@ -711,6 +724,8 @@ function renderHero() {
 }
 async function selectSeries(item) {
   const origin = document.activeElement;
+  const workKey=item.work_id??item.id;
+  if(pickedWorkKey!==workKey){pickedWorkKey=workKey;detailTabs.select('chapters');}
   if (!visibleSeries().some(series => series.id === item.id)) {
     $('source-filter').value = ''; $('library-query').value = ''; $('only-unread').checked = false;
     filterLibrary('');
@@ -735,7 +750,7 @@ async function selectSeries(item) {
   setDialog('chapter-controls', true);
   dialogOrigins.set('chapter-controls', origin?.isConnected ? origin : document.querySelector('#series-grid .series-card.selected .series-choice') ?? $('show-saved'));
   await loadLibraryChapters();
-  if (!$('chapter-controls').hidden) chapterBrowser.focus();
+  if ($('chapter-controls').open&&detailTabs.active==='chapters') chapterBrowser.focus();
 }
 function visibleSeries() { return groupWorks(filterSeries(series.filter(item=>inLibraryScope(item,$('genre-filter').value==='adult'?'adult':'library')), { source: $('source-filter').value, query: $('library-query').value,
   unreadOnly: $('only-unread').checked, sort: $('library-sort').value,genre:$('genre-filter').value,author:$('author-filter').value,
@@ -773,15 +788,19 @@ function filterLibrary(selectedId = $('series-select').value) {
   if ($('series-select').value) loadLibraryChapters();
 }
 function showSearch(show) {
-  navigateView(show ? 'explore' : 'library');
+  return navigateView(show ? 'explore' : 'library');
 }
 function navigateView(view, push = true) {
+  const destination=['home','library','discover','explore','settings','private'].includes(view)?view:'home';
+  return changeView(()=>applyView(destination,push),{animate:push&&(activeView!==destination||$('library').hidden),privateView:activeView==='private'||destination==='private'||Boolean(current?.privateReading)});
+}
+function applyView(view,push) {
   if (!['home','library','discover','explore','settings','private'].includes(view)) view = 'home';
   if (!$('library').hidden) viewScroll.set(activeView, window.scrollY);
-  setLibrary(true); activeView = view;
+  applyLibrary(true); activeView = view;
   privacy?.leave(view);
   const sections = {home:'home-panel',library:'saved-panel',discover:'discover-panel',explore:'search-panel',settings:'settings-panel',private:'private-panel'};
-  for (const [name,id] of Object.entries(sections)) $(id).hidden = name !== view;
+  for (const [name,id] of Object.entries(sections)) {$(id).hidden = name !== view;$(id).classList.toggle('view-enter',name===view);}
   const title = {home:'Una historia más',library:'Mi biblioteca',discover:'Descubrir',explore:'Buscar',settings:'A tu manera',private:'Mi espacio privado'};
   const subtitle = {home:'Retoma tus historias y sigue sus actualizaciones.',library:'Todas tus historias, a tu ritmo.',discover:'Tu siguiente historia empieza aquí.',explore:'Elige tus fuentes y encuentra tu próxima lectura.',settings:'Tu tema, tu color, tu espacio.',private:'Tus historias, fuera de las vistas habituales.'};
   $('library-title').replaceChildren(document.createTextNode(title[view]),Object.assign(document.createElement('span'),{className:'heading-dot',textContent:'.'}));
@@ -808,7 +827,7 @@ async function addFavorite(url, options = {}) {
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url_origen: url, ...(options.is_private?{is_private:true}:{}) }) });
     if(favorite.is_adult||favorite.is_private||options.adult){
       $('series-url').value='';setDialog('add-panel',false);
-      if(favorite.is_private)navigateView('private');else {$('genre-filter').value='adult';navigateView('library');}
+      if(favorite.is_private)await navigateView('private');else {$('genre-filter').value='adult';await navigateView('library');}
       if(sourceCatalog.find(source=>source.id===favorite.source)?.capabilities.chapters)await api(`/api/series/${favorite.id}/sync`,{method:'POST',signal:controller.signal});
       await loadLibrary();notice(favorite.is_private?'Guardada en tu biblioteca privada.':'Guardada con el género +18.');const saved=series.find(item=>item.id===favorite.id);if(saved)await selectSeries(saved);
       return;
@@ -818,7 +837,7 @@ async function addFavorite(url, options = {}) {
     await loadLibrary();
     controller.signal.throwIfAborted();
     $('series-select').value = String(favorite.id); cards();
-    $('series-url').value = ''; showSearch(false);
+    $('series-url').value = ''; await showSearch(false);
     setDialog('add-panel', false);
     await loadLibraryChapters(true);
     controller.signal.throwIfAborted();
@@ -831,7 +850,7 @@ async function addFavorite(url, options = {}) {
   } catch (error) { $('library-status').textContent = controller.signal.aborted ? 'Consulta cancelada.' : error.message; $('search-status').textContent = $('library-status').textContent; $('add-status').textContent = $('library-status').textContent; }
   finally { $('add-series').disabled = false; endQuery(controller); }
 }
-function closeChapter() {
+async function closeChapter() {
   const returnView=current?.trial?.returnView;
   flushProgress(); chapterAbort?.abort(); disposePages();
   current = null; dirty = false; restoring = false;
@@ -843,17 +862,17 @@ function closeChapter() {
   $('chapter-meta').textContent = 'Capítulo cerrado. Las imágenes se cargarán de nuevo cuando lo abras.';
   $('page-position').textContent = 'Listo para leer'; $('reading-progress').value = 0; $('progress-label').textContent = '0%';
   history.replaceState(null, '', location.pathname); document.title = 'Lector Manga'; window.scrollTo(0, 0);
-  loadLibrary(); setLibrary(true);if(returnView)navigateView(returnView);
+  await navigateView(returnView??activeView);loadLibrary();
 }
 
 $('library-toggle').addEventListener('click', () => navigateView('library'));
 $('welcome-library').addEventListener('click', () => navigateView('library'));
 $('library-close').addEventListener('click', () => { if (current) setLibrary(false); });
 $('hero-action').addEventListener('click', () => { if (heroSeries) heroSeries.ultimo_capitulo_id ? openChapter(heroSeries.ultimo_capitulo_id) : selectSeries(heroSeries); });
-$('add-toggle').addEventListener('click', () => { setLibrary(true); $('add-status').textContent = ''; setDialog('add-panel', true); dialogOrigins.set('add-panel', $('add-toggle')); });
+async function openAddDialog(origin=$('add-toggle')){await setLibrary(true);$('add-status').textContent='';setDialog('add-panel',true);dialogOrigins.set('add-panel',origin);}
+$('add-toggle').addEventListener('click',()=>openAddDialog());
 $('add-close').addEventListener('click', () => setDialog('add-panel', false));
 $('picker-close').addEventListener('click', () => setDialog('chapter-controls', false));
-for (const id of dialogs) $(id).addEventListener('click', event => { if (event.target === $(id)) setDialog(id, false); });
 $('refresh-library').addEventListener('click', loadLibrary);
 $('source-filter').addEventListener('change', () => filterLibrary(''));
 $('add-series-form').addEventListener('submit', event => { event.preventDefault(); addFavorite($('series-url').value.trim()); });
@@ -901,15 +920,7 @@ window.addEventListener('resize', debounce(() => { if (current) {
   const point=anchor();layoutPages();restoreAnchor(point);observePages();updatePosition();
 } }, 150));
 document.addEventListener('keydown', event => {
-  const dialog = dialogs.find(id => !$(id).hidden);
-  if (event.key === 'Escape') { if (dialog) setDialog(dialog, false); else if (!$('library').hidden && current) setLibrary(false); }
-  if (event.key === 'Tab' && dialog) {
-    const controls = [...$(dialog).querySelectorAll('button, input, select, textarea, summary, a[href], [tabindex]:not([tabindex="-1"])')].filter(element => !element.disabled && element.getClientRects().length);
-    const first = controls[0], last = controls.at(-1);
-    if (!controls.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
-    else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-  }
+  if(event.key==='Escape'&&!document.querySelector('dialog[open]')&&!$('library').hidden&&current)setLibrary(false);
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { flushProgress();queue.clear();for (const slot of slots) { slot.cancel?.();unload(slot); } } else reconcileImages(); });
 window.addEventListener('pagehide', () => {
@@ -959,7 +970,7 @@ function clearSensitive({onlySeries}={}) {
 let alternatives;
 const preview=createSeriesPreview({api,add:addFavorite,select:selectSeries,sourceName,alternatives:(...args)=>alternatives(...args),read:(item,chapter,list,options)=>options?.saved ? openChapter(item.ultimo_capitulo_id) : openChapter(chapter.id,{trial:{item,list,returnView:activeView}}),findSaved:item=>series.find(row=>!row.is_private&&row.source===item.source&&row.url_origen===(item.url??item.url_origen))});
 alternatives=createSourceAlternatives({api,state:()=>({series,sources:sourceCatalog}),preview,select:selectSeries,sourceName});
-$('reader-trial-ficha').addEventListener('click',()=>{if(!current?.trial)return;const {item,returnView}=current.trial;navigateView(returnView);preview(item);});
+$('reader-trial-ficha').addEventListener('click',async()=>{if(!current?.trial)return;const {item,returnView}=current.trial;await navigateView(returnView);preview(item);});
 $('reader-failed-alternatives').addEventListener('click',()=>$('reader-alternatives').click());
 $('reader-alternatives').addEventListener('click',()=>{const info=failedReading??(current?{item:current.trial?.item??series.find(item=>item.id===current.serie_id),number:current.number??current.numero??null}:null);if(info?.item&&!info.item.is_private)alternatives(info.item,{number:info.number});});
 shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:activeView,privateUnlocked:privacy?.unlocked()??false}),navigate:navigateView,select:selectSeries,
@@ -979,8 +990,8 @@ if(canLoad)await loadLibrary();
 if(cloudMode&&canLoad)await replayPending();
 const initial = new URLSearchParams(location.search).get('chapter');
 const initialView = location.hash.slice(1);
-if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial); if (initialView) { navigateView(initialView,false); history.replaceState({view:activeView},'',location.pathname+location.search+'#'+activeView); } }
-else navigateView(initialView || 'home',false);
+if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial); if (initialView) { await navigateView(initialView,false); history.replaceState({view:activeView},'',location.pathname+location.search+'#'+activeView); } }
+else await navigateView(initialView || 'home',false);
 $('add-toggle').disabled=!canLoad;
 if(cloudMode&&canLoad&&accountUser())accountUI.synchronize();
 if(cloudMode&&'serviceWorker' in navigator)navigator.serviceWorker.register(new URL('./sw.js',import.meta.url),{scope:new URL('./',import.meta.url).pathname}).catch(()=>{});

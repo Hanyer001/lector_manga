@@ -1,9 +1,10 @@
 import {normalizeTag,itemKey} from './discovery-core.js';
+import {initializeDialog} from './dialog-ui.js';
 // Las coincidencias son candidatos, nunca enlaces o transferencias automáticos.
 export function createSourceAlternatives({api,state,preview,select,sourceName}) {
   const dialog=document.createElement('dialog');dialog.className='source-alternatives';dialog.setAttribute('aria-labelledby','alternative-title');
   dialog.innerHTML='<div class="panel-heading"><h2 id="alternative-title">Otras fuentes</h2><button type="button" class="button" aria-label="Cerrar otras fuentes">✕</button></div><p data-note class="small muted"></p><div data-results class="alternative-list"></div><p data-status role="status" class="small muted"></p>';
-  document.body.append(dialog);let controller;
+  document.body.append(dialog);initializeDialog(dialog);let controller;
   dialog.querySelector('button').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>controller?.abort());
   return async(item,{number=null}={})=>{
     if(item.is_private)return;controller?.abort();controller=new AbortController();const signal=controller.signal,results=dialog.querySelector('[data-results]'),status=dialog.querySelector('[data-status]');results.replaceChildren();

@@ -4,7 +4,15 @@ export function createReaderControls({change,jump,step,library,close,active}) {
   const $=id=>document.getElementById(id);
   let preferences;
   try {preferences=normalizeReaderPreferences(JSON.parse(localStorage.getItem(key)||'{}'));} catch {preferences={...readerDefaults};}
-  let visible=false, timer, pointer, lastUpdate;
+  let visible=false, timer, pointer, lastUpdate,guideTimer;
+  const guide=$('reader-touch-guide');
+  function hideTouchGuide(){clearTimeout(guideTimer);guide.hidden=true;}
+  function showTouchGuide(){
+    hideTouchGuide();
+    if(!active()||preferences.zoom>100||preferences.fit==='original')return;
+    guide.hidden=false;
+    guideTimer=setTimeout(hideTouchGuide,2000);
+  }
   const bindings={mode:'reading-mode',direction:'reading-direction',fit:'reading-fit',zoom:'reading-zoom',width:'reader-width',brightness:'reading-brightness',warmth:'reading-warmth',prefetch:'reading-prefetch'};
   function refresh() {
     for(const [name,id] of Object.entries(bindings)) $(id).value=preferences[name];
@@ -14,6 +22,7 @@ export function createReaderControls({change,jump,step,library,close,active}) {
     document.documentElement.style.setProperty('--reader-warmth',preferences.warmth/100);
     $('reading-direction').disabled=preferences.mode!=='paged';
     $('reader-tap-zones').dataset.zoomed=String(preferences.zoom>100||preferences.fit==='original');
+    if(preferences.zoom>100||preferences.fit==='original')hideTouchGuide();
     $('reader-help').textContent=preferences.mode==='paged' ? `Centro o C / Espacio: controles · ${preferences.direction==='rtl'?'← siguiente · → anterior':'→ siguiente · ← anterior'}` : 'Centro o C / Espacio: controles · Flechas: desplazamiento';
   }
   function save() {try{localStorage.setItem(key,JSON.stringify(preferences));}catch{/* Activo durante la sesión. */}}
@@ -70,15 +79,15 @@ export function createReaderControls({change,jump,step,library,close,active}) {
   }
   for(const zone of $('reader-tap-zones').children)zone.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();event.stopPropagation();tap(zone.dataset.readerTap);}});
   document.addEventListener('keydown',event=>{
-    if(!active()||event.ctrlKey||event.metaKey||event.altKey)return;
+    if(!active()||document.querySelector('dialog[open]')||event.ctrlKey||event.metaKey||event.altKey)return;
     if(event.key==='Escape'){event.preventDefault();setVisible(false);return;}
     if(/^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)||event.target.isContentEditable || (event.key===' '&&event.target.tagName==='BUTTON'))return;
     if(['c','f',' '].includes(event.key.toLowerCase())){event.preventDefault();setVisible(!visible);}
     else if(preferences.mode==='paged'&&pageStep(event.key,preferences.direction)){event.preventDefault();step(pageStep(event.key,preferences.direction));}
   });
   refresh();
-  return {get preferences(){return preferences;},setVisible,
-    activate(show=true){document.body.classList.toggle('reader-active',active());setVisible(show);},
+  return {get preferences(){return preferences;},setVisible,showTouchGuide,
+    activate(show=true){document.body.classList.toggle('reader-active',active());if(!active())hideTouchGuide();setVisible(show);},
     update({index,total,title,series,previous,next,read,busy}) {
       const signature=JSON.stringify([index,total,title,series,previous,next,read,busy,preferences.mode,preferences.direction]);if(signature===lastUpdate)return;lastUpdate=signature;
       $('overlay-title').textContent=title;$('overlay-series').textContent=series;

@@ -103,7 +103,7 @@ export function createAccountUI({ api, reload, navigate, beforeSignOut = async (
     try { await beforeSignOut(); await signOut(); clearAccountMedia(); location.replace(location.pathname); }
     catch (error) { status(error.message); $('account-signout').disabled = false; }
   });
-  $('account-open').addEventListener('click', () => { navigate('settings'); $('account-panel').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+  $('account-open').addEventListener('click', async () => { await navigate('settings'); $('account-panel').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
   $('account-sync').addEventListener('click', () => synchronize({ force: true }));
   $('account-export').addEventListener('click', async () => {
     $('account-export').disabled = true;
