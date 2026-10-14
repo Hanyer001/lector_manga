@@ -25,9 +25,11 @@ test('controles visuales: preferencias persistentes, filtros sincronizados y not
   await page.getByRole('button',{name:'Quitar filtro Completado',exact:true}).click();
   await expect(control(page,'reading-filter','')).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'Elegir Historia de prueba',exact:true}).click();
+  await page.getByRole('tab',{name:'Detalles y Fuentes',exact:true}).click();
   await control(page,'work-rating','8').click();
   await expect(page.locator('#work-status')).toContainText('guardaron');
   await page.reload();await page.getByRole('button',{name:'Elegir Historia de prueba',exact:true}).click();
+  await page.getByRole('tab',{name:'Detalles y Fuentes',exact:true}).click();
   await expect(control(page,'work-rating','8')).toHaveAttribute('aria-pressed','true');
   await control(page,'work-rating','').click();
   await expect(page.locator('#work-rating')).toHaveValue('');

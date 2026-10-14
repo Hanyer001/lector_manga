@@ -122,6 +122,7 @@ test('bóveda E2EE: entrega recuperación, conserva el ancla y elimina los datos
   try{
     await page.goto(isolated.web);
     await page.getByRole('button',{name:'Elegir Historia de prueba',exact:true}).click();
+    await page.getByRole('tab',{name:'Organizar',exact:true}).click();
     await page.getByRole('button',{name:'Mover a privada',exact:true}).click();
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);
     await page.getByRole('textbox',{name:'Repite tu contraseña',exact:true}).fill(password);
@@ -231,6 +232,7 @@ test('invitado: privada cifrada persistente al recargar',async({page})=>{
     await page.goto(isolated.web+'?qa_user=none');
     await openAdd(page);await page.locator('#series-url').fill(isolated.api+'/qa/manga');await page.locator('#add-series').click();
     await expect(page.locator('#chapter-controls')).toBeVisible();
+    await page.getByRole('tab',{name:'Organizar',exact:true}).click();
     await page.getByRole('button',{name:'Mover a privada',exact:true}).click();
     const password='Bóveda de prueba sin cuenta 958';
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);
