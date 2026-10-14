@@ -20,7 +20,11 @@ export function createChapterBrowser(container, { onChoose, temporary = false } 
   container.classList.add('chapter-browser');
   container.innerHTML = `<div class="chapter-browser-tools"><label for="${prefix}-query" class="sr-only">Buscar capítulo</label><input id="${prefix}-query" type="search" placeholder="Buscar capítulo o número…" maxlength="200"><label for="${prefix}-order" class="sr-only">Orden de capítulos</label><select id="${prefix}-order"><option value="asc">Primeros capítulos</option><option value="desc">Últimos capítulos</option></select><label for="${prefix}-filter" class="sr-only">Estado del capítulo</label><select id="${prefix}-filter"><option value="all">Todos</option><option value="unread">Pendientes</option><option value="read">Leídos</option><option value="last">Último abierto</option></select></div><p class="chapter-count small muted" role="status" aria-live="polite"></p><ul class="chapter-list" aria-label="Capítulos disponibles"></ul><button class="button chapter-more" type="button" hidden>Mostrar más capítulos</button>`;
   const query = container.querySelector('input'), [order, filter] = container.querySelectorAll('select');
-  const list = container.querySelector('ul'), count = container.querySelector('.chapter-count'), more = container.querySelector('button');
+  const list = container.querySelector('ul'), count = container.querySelector('.chapter-count'), more = container.querySelector('.chapter-more');
+  const reverse=document.createElement('button');reverse.type='button';reverse.className='button chapter-order-toggle';reverse.id=prefix+'-reverse';
+  reverse.setAttribute('aria-label','Invertir orden de capítulos');
+  order.hidden=true;order.after(reverse);
+  reverse.addEventListener('click',()=>{order.value=order.value==='asc'?'desc':'asc';order.dispatchEvent(new Event('change',{bubbles:true}));});
   if (temporary) filter.hidden = true;
   let chapters = [], lastId, selectedId, limit = 60, busy = false;
   function render() {
@@ -49,6 +53,7 @@ export function createChapterBrowser(container, { onChoose, temporary = false } 
     more.textContent = `Mostrar ${Math.min(60, Math.max(0, entries.length - limit))} capítulos más`;
     list.scrollTop = scrollTop;
     query.disabled = order.disabled = filter.disabled = busy || !chapters.length;
+    reverse.disabled=order.disabled;reverse.textContent=order.value==='asc'?'↑ Ascendente':'↓ Descendente';reverse.setAttribute('aria-pressed',String(order.value==='desc'));
   }
   for (const control of [query, order, filter]) control.addEventListener(control === query ? 'input' : 'change', () => { limit = 60; render(); });
   more.addEventListener('click', () => { limit += 60; render(); });

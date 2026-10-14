@@ -6,9 +6,8 @@ import {USERS} from '../test/helpers/account-store.js';
 let demo;
 async function navigateSection(page, view) {
   const target=page.locator(view==='settings'?'#show-settings':'#show-private');
-  if(await target.isVisible())return target.click();
-  await page.locator('#show-more').click();
-  await page.locator('[data-more-view="'+view+'"]').click();
+  // Espera también a que termine el cambio desde el lector a la biblioteca.
+  await target.click();
 }
 async function openAdd(page) {
   if(await page.locator('#add-toggle').isVisible())return page.locator('#add-toggle').click();
@@ -122,6 +121,7 @@ test('bóveda E2EE: entrega recuperación, conserva el ancla y elimina los datos
   try{
     await page.goto(isolated.web);
     await page.getByRole('button',{name:'Elegir Historia de prueba',exact:true}).click();
+    await page.getByRole('tab',{name:'Organizar',exact:true}).click();
     await page.getByRole('button',{name:'Mover a privada',exact:true}).click();
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);
     await page.getByRole('textbox',{name:'Repite tu contraseña',exact:true}).fill(password);
@@ -231,6 +231,7 @@ test('invitado: privada cifrada persistente al recargar',async({page})=>{
     await page.goto(isolated.web+'?qa_user=none');
     await openAdd(page);await page.locator('#series-url').fill(isolated.api+'/qa/manga');await page.locator('#add-series').click();
     await expect(page.locator('#chapter-controls')).toBeVisible();
+    await page.getByRole('tab',{name:'Organizar',exact:true}).click();
     await page.getByRole('button',{name:'Mover a privada',exact:true}).click();
     const password='Bóveda de prueba sin cuenta 958';
     await page.getByRole('textbox',{name:'Contraseña de cifrado',exact:true}).fill(password);
