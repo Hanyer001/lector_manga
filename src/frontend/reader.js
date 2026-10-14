@@ -635,7 +635,7 @@ async function loadLibrary() {
     const [publicSeries, sources] = await Promise.all([api('/api/series',{onRevision:value=>{libraryRevision=value;}}), api('/api/sources')]);
     const scope=privacy?.unlocked()?'private':null;
     const protectedSeries=scope?await api('/api/series?scope='+scope):[];
-    if(scopeVersion!==activeView||(scope==='private'&&!privacy?.unlocked()))return;
+    if(loadingVersion!==libraryLoadVersion||scopeVersion!==activeView||(scope==='private'&&!privacy?.unlocked()))return;
     if(cloudMode) {
       const publicIds=new Set(publicSeries.map(item=>item.id));
       const removed=series.filter(item=>!item.is_private&&!publicIds.has(item.id));
@@ -653,7 +653,6 @@ async function loadLibrary() {
         notice('La lectura cambió en otro dispositivo. Ábrela de nuevo desde tu biblioteca.');
       } else current.privateReading=Boolean(visible.is_private);
     }
-    if(loadingVersion!==libraryLoadVersion)return;
     series=[...publicSeries,...protectedSeries];sourceCatalog=sources;libraryLoaded=true;
     const selected = $('source-filter').value;
     $('source-filter').replaceChildren(new Option('Todas las fuentes', ''));
