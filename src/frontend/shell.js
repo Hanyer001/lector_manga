@@ -1,9 +1,8 @@
 import { renderSeriesCards, setGridLoading } from './library-view.js';
 import { syncSelectControls } from './ui-controls.js';
-import { setCover } from './network.js';
 import { createDiscoveryUI } from './discovery-ui.js';
-import { groupWorks } from './discovery-core.js';
 import { isPublicReading } from './content-policy.js';
+import {createHomeUI} from './home-ui.js';
 
 const $ = id => document.getElementById(id);
 const text = (tag, value, className = '') => Object.assign(document.createElement(tag), { textContent:value, className });
@@ -17,6 +16,13 @@ export function createShell({ preview, api, state, navigate, select, resume, add
   const hasFavorite = item => state().series.some(saved=>sameWork(saved,item));
   const cardOptions = () => ({ sourceName,onSelect:preview,onResume:resume,onAdd:item=>add(item.url),hasFavorite });
   const discovery=createDiscoveryUI({preview,api,state,reload,select,add,navigate,beginQuery,endQuery,sourceName});
+  const home=createHomeUI({state,navigate,select,resume,sourceName,openLibrary:async mode=>{
+    clearFilters();
+    if(mode==='reading'||mode==='planned')$('reading-filter').value=mode;
+    if(mode==='unread')$('only-unread').checked=true;
+    await navigate('library');filter();syncSelectControls('reading-filter');
+  }});
+  let updatesError='';
   function fill(id, values, placeholder, unknown=false) {
     const previous=$(id).value;
     $(id).replaceChildren(new Option(placeholder,''),...values.map(value=>new Option(value.name??value,value.id??value)));
@@ -44,33 +50,18 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('continue-carousel').scrollBy({left:(id==='continue-prev'?-1:1)*400,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   });
   function renderHome() {
-    const synced = state().series.filter(isPublicReading).map(item => Number(item.last_sync_at) || 0).filter(Boolean);
-    $('library-updated').textContent = synced.length ? 'Última actualización de capítulos: ' + new Date(Math.max(...synced)).toLocaleString('es', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Actualiza tus series para ver nuevos capítulos.';
-    const recent=groupWorks(state().series.filter(isPublicReading)).filter(item=>item.ultimo_capitulo_id).sort((a,b)=>(b.ultima_lectura??0)-(a.ultima_lectura??0)).slice(0,10);
-    renderSeriesCards($('continue-carousel'),recent,{sourceName,onSelect:select,onResume:resume});
-    if(!recent.length) $('continue-carousel').replaceChildren(text('p','Tus últimas lecturas aparecerán aquí.','series-empty'));
-    $('continue-prev').disabled=$('continue-next').disabled=recent.length<2;
-    $('updates-list').replaceChildren();
-    if(!updates.length) $('updates-list').append(text('p','No hay novedades detectadas. Actualiza tus series para comprobarlas.','series-empty'));
-    for(const update of updates) {
-      const row=document.createElement('article');row.className='update-card';
-      if(update.coverUrl) {const image=document.createElement('img');image.alt='';image.loading='lazy';row.append(image);setCover(image,update.coverUrl);}
-      const copy=document.createElement('div');copy.append(text('h3',update.titulo),text('p',update.chapter_title),
-        text('p',`${sourceName(update.source)} · Detectado ${new Date(update.first_seen_at).toLocaleDateString('es')}`));
-      const button=text('button','Leer ↗','button primary');button.type='button';button.addEventListener('click',()=>resume({...update,ultimo_capitulo_id:update.id}));
-      row.append(copy,button);$('updates-list').append(row);
-    }
+    home.render(updates,updatesError);
   }
   $('sync-library').addEventListener('click',async()=>{
     const saved=state().series.filter(item=>isPublicReading(item)&&state().sources.some(source=>source.id===item.source&&source.enabled));
     if(!saved.length){$('updates-status').textContent='Añade una serie de una fuente activa para actualizarla.';return;}
-    syncAbort?.abort();const controller=syncAbort=beginQuery();$('sync-library').disabled=true;
+    syncAbort?.abort();const controller=syncAbort=beginQuery();$('sync-library').dataset.syncing='true';$('sync-library').disabled=true;
     let cursor=0,finished=0;const failures=[];
     const worker=async()=>{while(cursor<saved.length&&!controller.signal.aborted){const item=saved[cursor++];try{await api(`/api/series/${item.id}/sync`,{method:'POST',signal:controller.signal});}catch(error){if(!controller.signal.aborted)failures.push(`${item.titulo}: ${error.message}`);}finished++;if(!controller.signal.aborted)$('updates-status').textContent=`Actualizando ${finished}/${saved.length} series…`;}};
     await Promise.all(Array.from({length:Math.min(3,saved.length)},worker));
-    await reload();
+    try{await reload();}catch(error){$('updates-status').textContent=error.message;}
     $('updates-status').textContent=controller.signal.aborted?'Actualización cancelada.':failures.length?`${finished-failures.length} series actualizadas. ${failures.join(' · ')}`:`${finished} series actualizadas. Se consultaron los enlaces de capítulos.`;
-    $('sync-library').disabled=false;endQuery(controller);
+    delete $('sync-library').dataset.syncing;renderHome();endQuery(controller);
   });
   function renderFolders() {
     $('folder-list').replaceChildren();
@@ -186,9 +177,10 @@ export function createShell({ preview, api, state, navigate, select, resume, add
   async function update() {
     const generation=++updateGeneration;
     const lockedPrivate=state().view==='private'&&!state().privateUnlocked;
-    const [folderData,updateData]=await Promise.all([lockedPrivate?[]:api('/api/folders'),api('/api/updates')]);
+    let nextUpdatesError='';
+    const [folderData,updateData]=await Promise.all([lockedPrivate?[]:api('/api/folders'),api('/api/updates').catch(error=>{nextUpdatesError=error.message;return [];})]);
     if(generation!==updateGeneration)return;
-    folders=folderData;updates=updateData;
+    folders=folderData;updates=updateData;updatesError=nextUpdatesError;
     if(state().view!=='private')fill('folder-filter',folders.map(f=>({id:f.id,name:`${f.name} (${f.count})`})),'Todas las historias');
     fill('genre-filter',[...[...new Set(state().series.filter(item=>!item.is_private).flatMap(item=>item.genres??[]))].sort(),{id:'adult',name:'+18'}],'Todos los géneros',true);
     fill('author-filter',[...new Set(state().series.filter(item=>!item.is_private).flatMap(item=>item.authors??[]))].sort(),'Todos los autores',true);
