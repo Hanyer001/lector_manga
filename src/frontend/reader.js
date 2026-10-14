@@ -1,7 +1,8 @@
 import {createChapterBrowser} from './chapter-browser.js';
 import {libraryProgress,publicationLabels} from './library-progress.js';
 import {tagLabel} from './discovery-core.js';
-import { renderSeriesCards } from './library-view.js';
+import { renderSeriesCards, setGridLoading } from './library-view.js';
+import { enhanceSelects, syncSelectControls } from './ui-controls.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
 import { readRecommendationStream } from './discovery-stream.js';
@@ -16,6 +17,7 @@ import { createAccountUI } from './account-ui.js';
 import { cloudMode, apiOrigin, apiFetch, apiUrl, accountUser, isGuest, receivePrivateStatus, isProxyUrl, setCover, clearTemporaryCovers } from './network.js';
 
 const $ = id => document.getElementById(id);
+enhanceSelects();
 const pages = $('pages');
 const viewportWidth = () => document.documentElement.clientWidth || innerWidth;
 let CACHE_KEY = 'lector-manga.reader.v1';
@@ -29,6 +31,7 @@ let checkpointAt=0,lastPage=0,lastPercent=-1;
 const sendingProgress=new Map();
 let current = null;
 let series = [];
+let libraryLoaded=false,libraryLoadVersion=0;
 let sourceCatalog = [];
 let chapters = [];
 let generation = 0;
@@ -49,7 +52,12 @@ $('show-more').addEventListener('click', () => setDialog('more-panel', true));
 $('more-close').addEventListener('click', () => setDialog('more-panel', false));
 for (const button of document.querySelectorAll('[data-more-view]')) button.addEventListener('click', () => navigateView(button.dataset.moreView));
 $('more-account').addEventListener('click', () => { setDialog('more-panel', false); $('account-open').click(); });
-for (const button of document.querySelectorAll('[data-welcome]')) button.addEventListener('click', () => button.dataset.welcome === 'add' ? setDialog('add-panel', true) : navigateView(button.dataset.welcome));
+for (const button of document.querySelectorAll('[data-welcome]')) button.addEventListener('click', () => {
+  if(button.dataset.welcome==='add'){
+    if($('add-toggle').disabled)return;
+    $('add-toggle').click();dialogOrigins.set('add-panel',button);
+  }else navigateView(button.dataset.welcome);
+});
 let shell;
 let privacy;
 let readerUI;
@@ -112,6 +120,9 @@ function setLibrary(open, { opening = false } = {}) {
   $('library').hidden = !open;
   document.querySelector('.skip-link').setAttribute('href', open ? '#library' : '#reader');
   document.body.classList.toggle('library-open', open);
+  const navigation=document.querySelector('nav[aria-label="Navegación principal"]');
+  navigation.inert=!open;
+  if(open)navigation.removeAttribute('aria-hidden');else navigation.setAttribute('aria-hidden','true');
   readerUI?.activate(!open);
   if (open) for (const slot of slots) { slot.cancel?.(); unload(slot); }
   $('library-toggle').setAttribute('aria-expanded', String(open));
@@ -614,6 +625,9 @@ async function loadLibraryChapters(sync = false) {
   finally { endQuery(controller); if (version === libraryGeneration) $('sync-chapters').disabled = false; }
 }
 async function loadLibrary() {
+  const loadingVersion=++libraryLoadVersion;
+  $('series-grid').hidden=false;setGridLoading($('series-grid'),true);
+  if(privacy?.unlocked())setGridLoading($('private-library'),true);
   try {
     const scopeVersion=activeView;
     const selectedSeries = $('series-select').value;
@@ -621,7 +635,7 @@ async function loadLibrary() {
     const [publicSeries, sources] = await Promise.all([api('/api/series',{onRevision:value=>{libraryRevision=value;}}), api('/api/sources')]);
     const scope=privacy?.unlocked()?'private':null;
     const protectedSeries=scope?await api('/api/series?scope='+scope):[];
-    if(scopeVersion!==activeView||(scope==='private'&&!privacy?.unlocked()))return;
+    if(loadingVersion!==libraryLoadVersion||scopeVersion!==activeView||(scope==='private'&&!privacy?.unlocked()))return;
     if(cloudMode) {
       const publicIds=new Set(publicSeries.map(item=>item.id));
       const removed=series.filter(item=>!item.is_private&&!publicIds.has(item.id));
@@ -639,7 +653,7 @@ async function loadLibrary() {
         notice('La lectura cambió en otro dispositivo. Ábrela de nuevo desde tu biblioteca.');
       } else current.privateReading=Boolean(visible.is_private);
     }
-    series=[...publicSeries,...protectedSeries];sourceCatalog=sources;
+    series=[...publicSeries,...protectedSeries];sourceCatalog=sources;libraryLoaded=true;
     const selected = $('source-filter').value;
     $('source-filter').replaceChildren(new Option('Todas las fuentes', ''));
     for (const source of sourceCatalog.filter(source=>(source.enabled&&!source.demo)||series.some(item=>item.source===source.id))) $('source-filter').add(new Option(`${source.name}${source.enabled ? '' : ' · no disponible'}`, source.id));
@@ -651,7 +665,7 @@ async function loadLibrary() {
     privacy?.render();
     filterLibrary(selectedSeries);
     renderHero();
-    $('library-welcome').hidden = !['home','library'].includes(activeView) || series.some(isPublicReading);
+    renderEmptyState();
     api('/api/storage').then(info => { $('storage-status').textContent = 'Lectura sin descargas guardadas · Base de datos: ' + (info.databaseBytes / 1024).toFixed(0) + ' KB · ' + info.chapters + ' enlaces de capítulos'; }).catch(() => {});
     const publicItems=series.filter(item=>!item.is_private),count=groupWorks(publicItems).length;
     $('library-status').textContent = count ? `${count} ${count === 1 ? 'obra' : 'obras'} · ${publicItems.length} fuentes guardadas` : 'Añade el enlace de una serie para comenzar.';
@@ -660,6 +674,14 @@ async function loadLibrary() {
     if($('home-notice').textContent.startsWith('No se pudo cargar la biblioteca.'))notice();
     return true;
   } catch (error) { $('library-status').textContent = error.message; notice(cloudMode?'No se pudo cargar la biblioteca. Comprueba tu conexión e inicia sesión de nuevo si es necesario.':'No se pudo cargar la biblioteca. Comprueba que la API local esté disponible.');return false; }
+  finally {if(loadingVersion===libraryLoadVersion){setGridLoading($('series-grid'),false);setGridLoading($('private-library'),false);renderEmptyState();}}
+}
+
+function renderEmptyState() {
+  const empty=libraryLoaded&&!series.some(item=>!item.is_private);
+  $('library-welcome').hidden=!empty||!['home','library'].includes(activeView);
+  $('home-content').hidden=empty;
+  $('series-grid').hidden=empty&&$('series-grid').getAttribute('aria-busy')!=='true';
 }
 
 function sourceName(id) { return sourceCatalog.find(source => source.id === id)?.name ?? id; }
@@ -746,6 +768,8 @@ function filterLibrary(selectedId = $('series-select').value) {
   fillChapters([]); $('sync-chapters').disabled = !$('series-select').value;
   cards();
   shell?.renderChips();
+  syncSelectControls('reading-filter');
+  renderEmptyState();
   if ($('series-select').value) loadLibraryChapters();
 }
 function showSearch(show) {
@@ -763,10 +787,10 @@ function navigateView(view, push = true) {
   $('library-title').replaceChildren(document.createTextNode(title[view]),Object.assign(document.createElement('span'),{className:'heading-dot',textContent:'.'}));
   $('library-subtitle').textContent=subtitle[view];
   const buttons={home:'show-home',library:'show-saved',discover:'show-discover',explore:'show-search',settings:'show-settings',private:'show-private'};
-  for (const [name,id] of Object.entries(buttons)) { $(id).setAttribute('aria-pressed',String(view===name));$(id).className='button '+(view===name?'primary':'subtle'); }
+  for (const [name,id] of Object.entries(buttons)) { $(id).setAttribute('aria-pressed',String(view===name));if(view===name)$(id).setAttribute('aria-current','page');else $(id).removeAttribute('aria-current');$(id).className='button '+(view===name?'primary':'subtle'); }
   $('show-more').setAttribute('aria-pressed', String(['settings','private'].includes(view)));
-  $('library-welcome').hidden = !['home','library'].includes(view) || series.some(isPublicReading);
-  (matchMedia('(max-width:768px)').matches && ['settings','private'].includes(view) ? $('show-more') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
+  renderEmptyState();
+  (matchMedia('(max-width:767px)').matches && view==='explore' ? $('search-query') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
   if (push && location.hash !== '#'+view) history.pushState({view},'',location.pathname+'#'+view);
   document.title=view==='private'?'Lector · Biblioteca privada':view==='discover'?'Lector · Descubrir':'Lector · Tu biblioteca';
   privacy?.enter(view);

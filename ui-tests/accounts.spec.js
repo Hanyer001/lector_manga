@@ -10,21 +10,26 @@ async function navigateSection(page, view) {
   await page.locator('#show-more').click();
   await page.locator('[data-more-view="'+view+'"]').click();
 }
+async function openAdd(page) {
+  if(await page.locator('#add-toggle').isVisible())return page.locator('#add-toggle').click();
+  await page.locator('#show-saved').click();
+  await page.locator('.mobile-shelf-actions [data-welcome="add"]').click();
+}
 async function revealResultOptions(page) {
   const details=page.locator('#discovery-result-options');
   if(await details.getAttribute('open')===null)await details.locator('summary').click();
 }
 
-test('OLED: navegación adaptable, tarjetas sobre portada y acento persistente',async({page},testInfo)=>{
+test('OLED: navegación adaptable, tarjetas uniformes y acento persistente',async({page},testInfo)=>{
   await page.goto(demo.web);await expect(page.locator('#add-toggle')).toBeEnabled();
   await expect(page.locator('html')).toHaveAttribute('data-theme','oled');
   await page.locator('#show-saved').click();
   const layout=await page.evaluate(()=>{const nav=document.querySelector('.library-tabs').getBoundingClientRect(),card=document.querySelector('#series-grid .series-card'),caption=card.querySelector('.series-caption');return {width:innerWidth,bottom:nav.bottom,left:nav.left,navWidth:nav.width,background:getComputedStyle(document.body).backgroundColor,captionPosition:getComputedStyle(caption).position,border:getComputedStyle(card).borderTopWidth,overflow:document.documentElement.scrollWidth>innerWidth};});
   expect(layout.background).toBe('rgb(0, 0, 0)');expect(layout.border).toBe('0px');expect(layout.captionPosition).toBe('static');expect(layout.overflow).toBe(false);
-  if(layout.width<=768)expect(layout.navWidth).toBeGreaterThan(300);else expect(layout.navWidth).toBeLessThan(250);
-  await navigateSection(page,'settings');await page.locator('#appearance-theme').selectOption('light');
+  expect(layout.navWidth).toBeGreaterThan(300);if(layout.width<768)expect(Math.abs(layout.bottom-page.viewportSize().height)).toBeLessThan(2);
+  await navigateSection(page,'settings');await page.locator('[data-select="appearance-theme"] [data-value="light"]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
-  await page.locator('#appearance-theme').selectOption('oled');await page.locator('#appearance-accent').selectOption('cyan');await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','oled');
+  await page.locator('[data-select="appearance-theme"] [data-value="oled"]').click();await page.locator('[data-select="appearance-accent"] [data-value="cyan"]').click();await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','oled');
   expect(await page.locator('html').evaluate(el=>getComputedStyle(el).getPropertyValue('--accent-color').trim().toLowerCase())).toBe('#22d3ee');
 });
 
@@ -50,7 +55,7 @@ test.afterAll(async()=>{await demo.close();});
 test('Pages con subcarpeta: cuenta, biblioteca, controles de lectura y ancla',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(demo.web);
-  await page.getByRole('button',{name:'Cuenta y sincronización',exact:true}).click();
+  await navigateSection(page,'settings');
   await expect(page.locator('#account-email')).toHaveText('a@example.test');
   await expect(page.getByRole('button',{name:'Exportar biblioteca',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Biblioteca',exact:true}).click();
@@ -74,7 +79,7 @@ test('importa un respaldo privado de otra cuenta con recuperación y mantiene su
   const backup={...empty.exportLibrary(),version:2,includesPrivate:true,privateVault:{owner:USERS.a.id,envelope:encrypted.envelope}};empty.close();
   try{
     await page.goto(isolated.web+'?qa_user=b');
-    await page.getByRole('button',{name:'Cuenta y sincronización',exact:true}).click();
+    await navigateSection(page,'settings');
     await page.locator('#account-import-file').setInputFiles({name:'respaldo-ficticio.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
     await expect(page.locator('#account-private-dialog')).toBeVisible();
     await page.locator('#account-private-pin').fill(password);await page.locator('#account-private-confirm').fill(password);
@@ -101,7 +106,7 @@ test('sin sesión usa biblioteca del dispositivo; otra cuenta empieza vacía',as
 
 test('el correo solicita un enlace y mantiene la biblioteca oculta hasta verificar la sesión',async({page})=>{
   await page.goto(demo.web+'?qa_user=none');
-  await page.getByRole('button',{name:'Cuenta y sincronización',exact:true}).click();
+  await navigateSection(page,'settings');
   await page.getByRole('button',{name:'Acceder con correo',exact:true}).click();
   await page.getByRole('textbox',{name:'Tu correo',exact:true}).fill('reader@example.test');
   await page.getByRole('button',{name:'Recibir enlace de acceso',exact:true}).click();
@@ -180,7 +185,7 @@ test('invitado: guarda lectura local, conserva ancla y permite volver sin cuenta
   const localDemo=await startAccountDemo({apiPort:0,webPort:0});
   try{
   await page.goto(localDemo.web+'?qa_user=none');
-  await page.locator('#add-toggle').click();await page.locator('#series-url').fill(localDemo.api+'/qa/manga');
+  await openAdd(page);await page.locator('#series-url').fill(localDemo.api+'/qa/manga');
   await page.locator('#add-series').click();await expect(page.locator('#chapter-controls')).toBeVisible();
   await expect(page.locator('#chapter-browser .chapter-row')).toHaveCount(3);
   await page.locator('#chapter-browser .chapter-row').nth(1).click();await expect(page.locator('#pages')).toHaveAttribute('aria-busy','false');
@@ -189,9 +194,9 @@ test('invitado: guarda lectura local, conserva ancla y permite volver sin cuenta
   await expect(page.locator('#page-position')).toContainText('Imagen 3 de 6');
   await expect(page.locator('#save-status')).toContainText('Guardado en este dispositivo');
   await page.reload();await expect(page.locator('#page-position')).toContainText('Imagen 3 de 6');
-  await page.locator('#reader-library').click();await page.getByRole('button',{name:'Cuenta y sincronización',exact:true}).click();
+  await page.locator('#reader-library').click();await navigateSection(page,'settings');
   await expect(page.locator('#account-email')).toContainText('sin cuenta');
-  await page.goto(localDemo.web+'?qa_user=b');await page.getByRole('button',{name:'Cuenta y sincronización',exact:true}).click();
+  await page.goto(localDemo.web+'?qa_user=b');await navigateSection(page,'settings');
   await page.locator('#account-device-import').click();await expect(page.locator('#account-status')).toContainText('La copia local se conserva');
   await page.getByRole('button',{name:'Biblioteca',exact:true}).click();await expect(page.locator('#series-grid')).toContainText('Historia de prueba');
   }finally{await localDemo.close();}
@@ -224,7 +229,7 @@ test('invitado: privada cifrada persistente al recargar',async({page})=>{
   const isolated=await startAccountDemo({apiPort:0,webPort:0});
   try{
     await page.goto(isolated.web+'?qa_user=none');
-    await page.locator('#add-toggle').click();await page.locator('#series-url').fill(isolated.api+'/qa/manga');await page.locator('#add-series').click();
+    await openAdd(page);await page.locator('#series-url').fill(isolated.api+'/qa/manga');await page.locator('#add-series').click();
     await expect(page.locator('#chapter-controls')).toBeVisible();
     await page.getByRole('button',{name:'Mover a privada',exact:true}).click();
     const password='Bóveda de prueba sin cuenta 958';

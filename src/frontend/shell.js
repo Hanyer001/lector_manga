@@ -1,4 +1,5 @@
-import { renderSeriesCards } from './library-view.js';
+import { renderSeriesCards, setGridLoading } from './library-view.js';
+import { syncSelectControls } from './ui-controls.js';
 import { setCover } from './network.js';
 import { createDiscoveryUI } from './discovery-ui.js';
 import { groupWorks } from './discovery-core.js';
@@ -26,9 +27,10 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     const preferences=window.LectorAppearance.get();
     for(const key of ['theme','accent','custom','density']) $('appearance-'+key).value=preferences[key];
     for(const key of ['flags','glass']) $('appearance-'+key).checked=preferences[key];
+    syncSelectControls();
   }
   appearanceForm();
-  for(const key of ['theme','accent','custom','density','flags','glass']) $('appearance-'+key).addEventListener('input',()=>{
+  for(const key of ['theme','accent','custom','density','flags','glass']) $('appearance-'+key).addEventListener(['theme','accent','density'].includes(key)?'change':'input',()=>{
     const control=$('appearance-'+key);
     window.LectorAppearance.set({ [key]:control.type==='checkbox'?control.checked:control.value,...(key==='custom'?{accent:'custom'}:{}) });
     appearanceForm(); $('appearance-status').textContent='Apariencia guardada en este navegador.';
@@ -135,7 +137,7 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     if(!group.element.isConnected)return;
     group.status.textContent=group.error??(group.loading?'Buscando…':`${group.items.length} resultados`);
     renderSeriesCards(group.grid,group.items,cardOptions());
-    if(group.loading&&!group.items.length)group.grid.replaceChildren(text('p','Consultando el catálogo…','series-empty'));
+    setGridLoading(group.grid,group.loading,6);
     if(group.error&&!group.items.length)group.grid.replaceChildren();
     group.more.hidden=group.nextPage===null||group.nextPage===undefined;
     group.more.disabled=group.loading;
@@ -159,14 +161,15 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('search-results').replaceChildren();$('search-results').classList.add('multi-results');$('search-more').hidden=true;
     searchGroups=ids.map(source=>{const element=document.createElement('section');element.className='search-group';const status=text('p','En espera…','small muted');status.setAttribute('role','status');const grid=document.createElement('div');grid.className='series-grid';
       const more=text('button','Más resultados de '+sourceName(source),'button');more.type='button';more.hidden=true;const retry=text('button','Reintentar '+sourceName(source),'button');retry.type='button';retry.hidden=true;
-      const group={source,query,adult,generation,element,status,grid,more,retry,items:[],nextPage:null};
+      grid.setAttribute('aria-label','Resultados de '+sourceName(source));
+      const group={source,query,adult,generation,element,status,grid,more,retry,items:[],nextPage:null,loading:true};
       const run=async isMore=>{const operation=beginQuery(),abort=()=>operation.abort();if(controller.signal.aborted)abort();else controller.signal.addEventListener('abort',abort,{once:true});try{await fetchGroup(group,operation,isMore);}finally{controller.signal.removeEventListener('abort',abort);endQuery(operation);}};
-      more.addEventListener('click',()=>run(true));retry.addEventListener('click',()=>run(false));element.append(text('h3',sourceName(source)),status,grid,more,retry);$('search-results').append(element);return group;});
+      more.addEventListener('click',()=>run(true));retry.addEventListener('click',()=>run(false));element.append(text('h3',sourceName(source)),status,grid,more,retry);$('search-results').append(element);renderSearchGroup(group);return group;});
     let cursor=0;
     $('search-status').textContent=`Buscando en ${ids.length} ${ids.length===1?'fuente':'fuentes'}…`;
     const worker=async()=>{while(cursor<searchGroups.length&&!controller.signal.aborted){const group=searchGroups[cursor++];await fetchGroup(group,controller);}};
     await Promise.all(Array.from({length:Math.min(3,searchGroups.length)},worker));
-    if(generation===searchGeneration){for(const group of searchGroups)if(!group.loading&&group.items.length===0&&controller.signal.aborted){group.error='Consulta cancelada.';renderSearchGroup(group);}
+    if(generation===searchGeneration){for(const group of searchGroups)if(controller.signal.aborted){group.loading=false;group.error='Consulta cancelada.';renderSearchGroup(group);}
       const errors=searchGroups.filter(g=>g.error).length;
       $('search-status').textContent=controller.signal.aborted?'Búsqueda cancelada.':`${searchGroups.reduce((n,g)=>n+g.items.length,0)} resultados · ${errors} ${errors===1?'fuente':'fuentes'} con error.`;}
     endQuery(controller);

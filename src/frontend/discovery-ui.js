@@ -1,6 +1,7 @@
 import { groupWorks, itemKey, normalizeTag, tagKey, tagLabel } from './discovery-core.js';
 import { discoveryTags } from './discovery-tags.js';
-import { renderSeriesCards } from './library-view.js';
+import { renderSeriesCards, setGridLoading } from './library-view.js';
+import { syncSelectControls } from './ui-controls.js';
 import { isPublicReading, isAdult } from './content-policy.js';
 import {createDiscoveryExtras} from './discovery-extras.js';
 const $=id=>document.getElementById(id);
@@ -89,8 +90,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     $('recommend-tools').hidden=!results.length;$('recommend-count').textContent=visible.length===results.length?String(results.length):`${visible.length} / ${results.length}`;
     if(!visible.length){
       if(phase==='loading'){
-        const placeholders=Array.from({length:6},()=>{const card=text('div','','discovery-skeleton');card.setAttribute('aria-hidden','true');card.append(text('div','','skeleton-cover'),text('div','','skeleton-line'),text('div','','skeleton-line short'));return card;});
-        $('recommend-results').replaceChildren(...placeholders);
+        setGridLoading($('recommend-results'),true,6);
       }else{
         const empty=text('div','','discovery-empty');empty.append(text('span','✦','empty-symbol'),text('h3',results.length?'Prueba otra búsqueda':phase==='error'?'No pudimos cargar las sugerencias':phase==='complete'?'Todavía hay más por descubrir':'Una historia para cada gusto'));
         empty.append(text('p',results.length?'Cambia el título o selecciona otro catálogo.':phase==='error'?'Pulsa Actualizar para volver a intentarlo.':phase==='complete'?lastMessage||'Prueba menos temas, otro género o más catálogos.':'Elige cómo quieres descubrir y pulsa Descubrir historias.','muted'));
@@ -98,6 +98,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
         $('recommend-results').replaceChildren(empty);
       }
     }
+    $('recommend-results').setAttribute('aria-busy',String(phase==='loading'));
     const container=$('recommend-source-results');container.replaceChildren();container.hidden=!providers.length;
     for(const [id,label] of [['',`Todos · ${results.length}`],...providers.map(p=>{const count=results.filter(item=>item.source===p.id).length;return [p.id,`${p.name} · ${count||({pending:'en espera',loading:'consultando…',error:'error de consulta',unsupported:'filtro no disponible'})[p.status]||(p.candidates?'sin afinidad':'sin resultados con filtros')}`];})]) {
       const button=text('button',label,'tag-chip');button.type='button';button.setAttribute('aria-pressed',String(resultSource===id));
@@ -201,6 +202,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     $('edition-link').dataset.confirm='';$('edition-link').textContent='Vincular edición';
     const editions=work?.editions??[item];
     $('work-rating').value=item.rating??'';
+    syncSelectControls('work-rating');
     for(const kind of ['like','dislike','neutral'])$('work-'+kind).setAttribute('aria-pressed',String((item.sentiment??'neutral')===kind));
     $('work-status').textContent='';
     $('edition-select').replaceChildren(...editions.map(e=>new Option(`${sourceName(e.source)} · ${e.total_capitulos} capítulos`,e.id)));$('edition-select').value=item.id;
