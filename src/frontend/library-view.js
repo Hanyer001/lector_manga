@@ -3,6 +3,18 @@ import { tagLabel } from './discovery-core.js';
 import { isAdult } from './content-policy.js';
 import { cloudMode, isProxyUrl, setCover } from './network.js';
 const cardStates=new WeakMap();
+export function setGridLoading(container, busy, count=8) {
+  container.setAttribute('aria-busy',String(busy));
+  for(const card of container.querySelectorAll(':scope > .grid-skeleton'))card.remove();
+  if(!busy)return;
+  for(let index=0;index<count;index++){
+    const card=document.createElement('div');card.className='grid-skeleton';card.setAttribute('aria-hidden','true');
+    for(const className of ['skeleton-cover','skeleton-line','skeleton-line short']){
+      const part=document.createElement('div');part.className=className;card.append(part);
+    }
+    container.append(card);
+  }
+}
 // Solo DOM y URLs firmadas locales: las portadas no se persisten en el cliente.
 export function renderSeriesCards(container, items, { selectedId, sourceName, onSelect, onResume, onRemove, onAdd, onFeedback, retainCards=true, hasFavorite = () => false } = {}) {
   const previous=retainCards?cardStates.get(container)??new Map():new Map(),next=new Map();
@@ -36,7 +48,7 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
     const code = document.createElement('span'); code.className = 'country-code'; code.textContent = known ? item.country : '◎'; code.setAttribute('aria-hidden','true');
     country.append(flag,code);
     const newBadge = document.createElement('span'); newBadge.className = 'new-badge'; newBadge.textContent = `${item.nuevos ?? 0} ${item.nuevos === 1 ? 'nuevo' : 'nuevos'}`; newBadge.hidden = !item.nuevos || Boolean(onAdd);
-    const fallback = () => { const text = document.createElement('span'); text.textContent = title; cover.replaceChildren(text,country,newBadge); };
+    const fallback = () => { const text = document.createElement('span'); text.className='cover-fallback';text.textContent = title; cover.replaceChildren(text,badge,country,newBadge); };
     if (isProxyUrl(item.coverUrl)) {
       const image = document.createElement('img'); image.alt = `Portada de ${title}`;
       image.loading = 'lazy'; image.decoding = 'async';
@@ -48,7 +60,7 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
       if(!cloudMode&&item.coverVariants?.length){image.srcset=item.coverVariants.filter(v=>isProxyUrl(v.url)).map(v=>`${v.url} ${v.width}w`).join(', ');image.sizes='(max-width: 599px) 45vw, 220px';}
     } else fallback();
     const name = document.createElement('span'); name.className = 'series-title'; name.textContent = title; name.title = title;
-    const caption=document.createElement('span');caption.className='series-caption';caption.append(name,badge);
+    const caption=document.createElement('span');caption.className='series-caption';caption.append(name);
     choose.append(cover, caption);
     choose.addEventListener('click', async () => {
       choose.disabled = true;

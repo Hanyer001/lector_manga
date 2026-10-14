@@ -1,4 +1,5 @@
 import { renderSeriesCards } from './library-view.js';
+import { syncSelectControls } from './ui-controls.js';
 import { groupWorks } from './discovery-core.js';
 import { filterSeries } from './reader-core.js';
 import { inLibraryScope } from './content-policy.js';
@@ -38,8 +39,10 @@ export function createPrivacyUI({api,state,navigate,reload,select,resume,add,cle
     renderSeriesCards($('private-library'),[],{...options(),retainCards:false});
     for(const id of ['private-library','private-filter-chips'])$(id).replaceChildren();
     $('private-count').textContent='';$('private-options').open=false;
+    syncSelectControls('private-reading-filter');
   }
   function drawFilters(rows) {
+    syncSelectControls('private-reading-filter');
     const values=field=>[...new Set(rows.flatMap(row=>row[field]??[]))].sort((a,b)=>a.localeCompare(b,'es'));
     fillFilter('private-source-filter',[...new Set(rows.map(row=>row.source))].map(id=>({id,name:sourceName(id)})),'Todas las fuentes');
     fillFilter('private-genre-filter',[...values('genres'),{id:'adult',name:'+18'}],'Todos los géneros',true);
