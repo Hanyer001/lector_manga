@@ -74,7 +74,7 @@ export default class ManhwaWeb extends BaseScraper {
     const unavailableTags=selected.filter((_,index)=>ids[index]===undefined);
     if(unavailableTags.length)return {source:this.id,results:[],unavailableTags};
     const params=new URLSearchParams({buscar:'',page:String(filters.page??0),estado:({ongoing:'publicandose',completed:'finalizado',hiatus:'pausado',cancelled:'cancelado'})[filters.status]??'',
-      tipo:({KR:'manhwa',JP:'manga',CN:'manhua'})[filters.country]??'',erotico:filters.adult?'si':'no',demografia:'',order_item:'popularidad',order_dir:'desc',generes:ids.join('a')});
+      tipo:({KR:'manhwa',JP:'manga',CN:'manhua'})[filters.country]??'',erotico:filters.adult?'si':'no',demografia:'',order_item:filters.catalogOrder==='newest'?'creacion':'popularidad',order_dir:'desc',generes:ids.join('a')});
     const data=await this.fetchJson(`manhwa/library?${params}`);
     if(!Array.isArray(data.data))throw new ScraperError('Catálogo de ManhwaWeb inválido.',{code:'INVALID_RESPONSE'});
     return {source:this.id,results:data.data.filter(item=>filters.adult?item._erotico==='si':item._erotico!=='si').map(item=>this.manga(item)),nextPage:data.next===true?(filters.page??0)+1:null,unavailableTags:[]};

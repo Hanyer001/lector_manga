@@ -68,7 +68,7 @@ export default class MangaDex extends BaseScraper {
     const include=[...(options.genres??[]).map(name=>({name,group:'genre'})),...(options.themes??[]).map(name=>({name,group:'theme'}))];
     const unavailableTags=include.filter(({name,group})=>!find(name,group)).map(t=>t.name);
     if(unavailableTags.length)return {source:this.id,results:[],nextPage:null,unavailableTags};
-    const params = new URLSearchParams({ limit: 32, offset: (options.page??0)*32, 'order[followedCount]': 'desc',includedTagsMode:'AND',excludedTagsMode:'OR',hasAvailableChapters:'true' });
+    const params = new URLSearchParams({ limit: 32, offset: (options.page??0)*32, [options.catalogOrder==='newest'?'order[createdAt]':'order[followedCount]']: 'desc',includedTagsMode:'AND',excludedTagsMode:'OR',hasAvailableChapters:'true' });
     for (const rating of options.adult ? ['erotica','pornographic'] : ['safe','suggestive']) params.append('contentRating[]', rating);
     for(const {name,group} of include)params.append('includedTags[]',find(name,group).id);
     for(const [key,group] of [['excludeGenres','genre'],['excludeThemes','theme']])for(const name of options[key]??[]){const tag=find(name,group);if(tag)params.append('excludedTags[]',tag.id);}

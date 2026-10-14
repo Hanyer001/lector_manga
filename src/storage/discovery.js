@@ -1,10 +1,11 @@
 import { ApiError, positiveId, httpUrl } from '../backend/errors.js';
 import { normalizeMetadata } from './metadata.js';
 import { itemKey } from '../frontend/discovery-core.js';
-export const defaultDiscovery = () => ({genres:[],themes:[],excludeGenres:[],excludeThemes:[],country:'',status:'',minChapters:0,genreMatch:'any',sources:[],onlyNew:false});
-export function validateDiscovery(input={}) {
+const defaultFilters = () => ({genres:[],themes:[],excludeGenres:[],excludeThemes:[],country:'',status:'',minChapters:0,genreMatch:'any',sources:[],onlyNew:false,catalogOrder:'popular'});
+export const defaultDiscovery = () => ({...defaultFilters(),favoriteWorkIds:[],savedSearches:[]});
+export function validateDiscoveryFilters(input={}) {
   if(!input||typeof input!=='object'||Array.isArray(input))throw new ApiError(400,'INVALID_PREFERENCES','Preferencias inválidas.');
-  const result=defaultDiscovery();
+  const result=defaultFilters();
   for(const key of ['genres','themes','excludeGenres','excludeThemes']) {
     const values=input[key]??[];
     if(!Array.isArray(values)||values.length>10||values.some(v=>typeof v!=='string'||!v.trim()||v.length>120))throw new ApiError(400,'INVALID_PREFERENCES','Usa hasta diez etiquetas de 120 caracteres por filtro.');
@@ -17,9 +18,26 @@ export function validateDiscovery(input={}) {
   result.genreMatch=input.genreMatch??'any';
   if(input.onlyNew!==undefined&&typeof input.onlyNew!=='boolean')throw new ApiError(400,'INVALID_PREFERENCES','Filtro de novedades inválido.');
   result.onlyNew=input.onlyNew??false;
+  if(input.catalogOrder!==undefined&&!['popular','newest'].includes(input.catalogOrder))throw new ApiError(400,'INVALID_PREFERENCES','Orden del catálogo inválido.');
+  result.catalogOrder=input.catalogOrder??'popular';
   if(input.sources!==undefined&&(!Array.isArray(input.sources)||input.sources.length>20||input.sources.some(id=>typeof id!=='string'||!/^[a-z0-9-]{1,80}$/.test(id))))throw new ApiError(400,'INVALID_PREFERENCES','Fuentes inválidas.');
   result.sources=[...new Set(input.sources??[])];
   if(!Number.isSafeInteger(result.minChapters)||result.minChapters<0||result.minChapters>1000)throw new ApiError(400,'INVALID_PREFERENCES','El mínimo debe ser un entero entre 0 y 1000.');
+  return result;
+}
+export function validateDiscovery(input={}) {
+  const result=validateDiscoveryFilters(input),favorites=input.favoriteWorkIds??[],searches=input.savedSearches??[];
+  if(!Array.isArray(favorites)||favorites.length>3||favorites.some(id=>!Number.isSafeInteger(id)||id<1))throw new ApiError(400,'INVALID_PREFERENCES','Elige hasta tres obras favoritas.');
+  if(!Array.isArray(searches)||searches.length>12)throw new ApiError(400,'INVALID_PREFERENCES','Puedes guardar hasta doce búsquedas.');
+  const ids=new Set(),names=new Set();
+  result.savedSearches=searches.map(search=>{
+    if(!search||typeof search!=='object'||Array.isArray(search)||typeof search.id!=='string'||!/^[a-zA-Z0-9-]{1,80}$/.test(search.id)||typeof search.name!=='string'||!search.name.trim()||search.name.trim().length>40||!['recommendations','newest','completed'].includes(search.collection??'recommendations'))throw new ApiError(400,'INVALID_PREFERENCES','Búsqueda guardada inválida.');
+    const name=search.name.trim(),key=name.toLocaleLowerCase('es');
+    if(ids.has(search.id)||names.has(key))throw new ApiError(400,'INVALID_PREFERENCES','Las búsquedas deben tener nombres distintos.');
+    ids.add(search.id);names.add(key);
+    return {id:search.id,name,collection:search.collection??'recommendations',filters:validateDiscoveryFilters(search.filters)};
+  });
+  result.favoriteWorkIds=[...new Set(favorites)];
   return result;
 }
 export function validateFeedback(input={}) {

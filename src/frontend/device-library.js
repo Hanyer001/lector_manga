@@ -1,6 +1,7 @@
 import {loadPrivateDatabase} from './vault-database.js';
 import {rankRecommendations,selectRecommendationSeeds,recommendationQueryTags,equivalentChapter} from './discovery-core.js';
 import {readRecommendationStream} from './discovery-stream.js';
+import {isPublicReading} from './content-policy.js';
 
 const fail=(message,code='DEVICE_STORAGE',status=503)=>Object.assign(new Error(message),{code,status});
 const response=(data,revision=0)=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json','X-Library-Revision':String(revision)}});
@@ -72,10 +73,11 @@ export function createDeviceLibrary({transport,storage=openDeviceStorage(),openS
     if(route==='/api/discovery/feedback')return save(()=>method==='DELETE'?db.removeRecommendationFeedback(body.key):db.saveRecommendationFeedback(body.item,body.feedback));
     if(route==='/api/discovery/seen'&&method==='DELETE')return save(()=>db.resetSeenRecommendations());
     if(route==='/api/discovery/recommendations'){
-      const discovery=db.getDiscovery(),ranking={...body,library:db.listSeries(),feedback:discovery.feedback,filters:body.filters??discovery.preferences},seeds=selectRecommendationSeeds(ranking);
+      const discovery=db.getDiscovery(),chosen=body.filters??discovery.preferences,adult=chosen.genres?.some(tag=>['adult','+18','18+'].includes(tag)),ranking={...body,library:db.listSeries().filter(item=>!item.is_private&&(adult||isPublicReading(item))),feedback:discovery.feedback,filters:chosen},seeds=selectRecommendationSeeds(ranking);
       let filters=ranking.filters;
       if(!filters.genres.length&&!filters.themes.length){const tags=recommendationQueryTags(seeds);filters={...filters,genres:tags.filter(t=>t.kind==='genres').slice(0,3).map(t=>t.key),themes:tags.filter(t=>t.kind==='themes').slice(0,2).map(t=>t.key)};}
-      const data=await send(route,{mode:'genres',filters,refresh:body.refresh,pages:body.pages},options);
+      const {favoriteWorkIds,savedSearches,...catalogFilters}=filters;
+      const data=await send(route,{mode:'genres',filters:catalogFilters,refresh:body.refresh,pages:body.pages},options);
       const results=rankRecommendations(data.results,{...ranking,limit:120});
       return {...data,mode:body.mode,personalized:seeds.some(seed=>seed.genres?.length||seed.themes?.length||seed.authors?.length),results,sources:(data.sources??[]).map(source=>({...source,count:results.filter(item=>item.source===source.id).length}))};
     }

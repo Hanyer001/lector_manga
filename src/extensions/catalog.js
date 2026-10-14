@@ -12,9 +12,9 @@ export const sourceDefinitions = [
   {
     id: 'manhwaweb', name: 'ManhwaWeb', baseUrl: 'https://manhwaweb.com/', languages: ['es'],
     pageOrigins: ['https://manhwaweb.com', 'https://www.manhwaweb.com'],
-    apiBaseUrl: 'https://manhwawebbackend-production.up.railway.app/',
+    apiBaseUrl: 'https://api.manhwaweb.com/',
     imageOrigins: ['https://manhwaweb.com', 'https://img1mw.xyz', 'https://img2mw.xyz',
-      'https://imagizer.imageshack.com', 'https://ccdn.lezhin.com'],
+      'https://imagizer.imageshack.com', 'https://ccdn.lezhin.com', 'https://uploads.manhwaweb.com'],
     capabilities: { search: true, manga: true, chapters: true, images: true, recommend: true, adult: true },
     load: () => import('./manhwaweb.js')
   },
