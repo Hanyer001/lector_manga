@@ -3,6 +3,10 @@ import {startAccountDemo} from '../examples/account-demo.js';
 import {openDatabase} from '../src/storage/database.js';
 import {USERS} from '../test/helpers/account-store.js';
 
+// Estas pruebas sustituyen el catálogo por respuestas deterministas. El worker
+// puede evitar esa interceptación en WebKit; se comprueba por separado en la suite.
+test.use({serviceWorkers:'block'});
+
 test('Descubrir: tres favoritos y búsquedas guardadas persisten por cuenta; novedades y terminadas consultan el catálogo',async({page})=>{
   const demo=await startAccountDemo({apiPort:0,webPort:0}),db=openDatabase(':memory:');
   try{
