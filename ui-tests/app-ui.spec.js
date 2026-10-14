@@ -46,6 +46,7 @@ test('bienvenida: dos acciones reales y desaparición al guardar la primera hist
   await expect(page.locator('#series-url')).toBeFocused();
   await page.locator('#series-url').fill(demo.api+'/qa/manga');await page.locator('#add-series').click();
   await expect(welcome).toBeHidden();await expect(page.locator('#series-grid .series-card')).toHaveCount(1);
+  await expect(page.locator('#chapter-controls')).toBeVisible();await page.locator('#picker-close').click();
   await page.locator('#show-home').click();await expect(welcome).toBeHidden();
 });
 
@@ -59,13 +60,13 @@ test('tarjetas: proporción estricta, densidad distinta y navegación fuera del 
   const comfortable=await columns();
   await page.locator('#show-settings').click();await control(page,'appearance-density','compact').click();
   await page.locator('#show-discover').click();expect(await columns()).toBeGreaterThan(comfortable);
-  const nav=page.getByRole('navigation',{name:'Navegación principal'});
+  const nav=page.locator('nav[aria-label="Navegación principal"]');
   if(page.viewportSize().width<768){
     await expect(nav.locator('button:visible')).toHaveText(['Inicio','Biblioteca','Descubrir','Privada','Ajustes']);
     const position=await nav.evaluate(el=>({bottom:el.getBoundingClientRect().bottom,height:innerHeight}));expect(Math.abs(position.height-position.bottom)).toBeLessThan(2);
   }else{
-    expect(await page.locator('header').evaluate(el=>getComputedStyle(el).position)).toBe('sticky');
-    expect(await page.locator('header').evaluate(el=>getComputedStyle(el).backdropFilter)).toBe('blur(16px)');
+    expect(await page.locator('header.topbar').evaluate(el=>getComputedStyle(el).position)).toBe('sticky');
+    expect(await page.locator('header.topbar').evaluate(el=>getComputedStyle(el).backdropFilter)).toBe('blur(16px)');
   }
   await page.locator('#show-saved').click();await page.getByRole('button',{name:'Continuar Historia de prueba',exact:true}).click();
   await expect(page.locator('#reader')).toBeVisible();await expect(nav).toBeHidden();
@@ -85,7 +86,7 @@ test('cargas: biblioteca, búsqueda y recomendaciones muestran esqueletos y los 
   await expect(page.locator('#series-grid .grid-skeleton')).toHaveCount(0);
   let releaseSearch;const searchPending=new Promise(resolve=>{releaseSearch=resolve;});
   await page.route('**/api/sources/*/search?*',async route=>{await searchPending;await route.continue();});
-  await page.goto(demo.web+'#explore');await page.locator('#search-query').fill('Historia');
+  await page.goto(demo.web+'#explore');await page.locator('#search-source').selectOption('qa-local');await page.locator('#search-query').fill('Historia');
   await expect(page.locator('#search-results [aria-busy=true] .grid-skeleton')).toHaveCount(6);
   releaseSearch();await expect(page.locator('#search-results .series-card')).toHaveCount(1);
   await expect(page.locator('#search-results .grid-skeleton')).toHaveCount(0);

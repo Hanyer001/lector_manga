@@ -20,13 +20,18 @@ test('Privada: mismos filtros, últimas lecturas primero y limpieza al bloquear'
     await page.goto(demo.web+'#private');
     await page.locator('#private-pin').fill(password);await page.getByRole('button',{name:'Desbloquear',exact:true}).click();
     await expect(page.locator('#private-library .series-title')).toHaveText(['Lectura más reciente','Lectura anterior','Sin empezar']);
+    const heights=await page.locator('#private-library .series-card').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().height));
+    expect(Math.max(...heights)-Math.min(...heights)).toBeLessThan(2);
     await expect(page.locator('#private-library-sort')).toBeVisible();
     await page.locator('#private-options summary').click();
     await page.locator('#private-source-filter').selectOption('qa-local');
     await page.locator('#private-genre-filter').selectOption('Action');
     await page.locator('#private-author-filter').selectOption('Autora reciente');
     await page.locator('#private-publication-filter').selectOption('ongoing');
+    await page.locator('#private-options summary').click();
     await page.locator('[data-select="private-reading-filter"] [data-value="reading"]').click();
+    await expect(page.locator('#private-reading-filter')).toHaveValue('reading');
+    await page.locator('#private-options summary').click();
     await page.locator('#private-folder-filter').selectOption(String(folder.id));
     await page.locator('#private-only-unread').check();
     await expect(page.locator('#private-library .series-title')).toHaveText(['Lectura más reciente']);
