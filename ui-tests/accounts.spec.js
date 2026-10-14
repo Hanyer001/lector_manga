@@ -6,9 +6,8 @@ import {USERS} from '../test/helpers/account-store.js';
 let demo;
 async function navigateSection(page, view) {
   const target=page.locator(view==='settings'?'#show-settings':'#show-private');
-  if(await target.isVisible())return target.click();
-  await page.locator('#show-more').click();
-  await page.locator('[data-more-view="'+view+'"]').click();
+  // Espera también a que termine el cambio desde el lector a la biblioteca.
+  await target.click();
 }
 async function openAdd(page) {
   if(await page.locator('#add-toggle').isVisible())return page.locator('#add-toggle').click();
