@@ -712,7 +712,7 @@ function sourceName(id) { return sourceCatalog.find(source => source.id === id)?
 function renderHero() {
   heroSeries = homeModel(series).hero;
   $('continue-hero').hidden = !heroSeries;
-  if (!heroSeries) { for(const id of ['hero-title','hero-chapter','hero-source'])$(id).textContent='';$('hero-cover').removeAttribute('src');$('hero-backdrop').removeAttribute('src');$('hero-progress').hidden=true;return; }
+  if (!heroSeries) { for(const id of ['hero-title','hero-chapter','hero-source'])$(id).textContent='';for(const id of ['hero-action','hero-details'])$(id).removeAttribute('aria-label');$('hero-cover').removeAttribute('src');$('hero-backdrop').removeAttribute('src');$('hero-progress').hidden=true;return; }
   $('hero-title').textContent = heroSeries.titulo;
   const progress = libraryProgress(heroSeries);
   $('hero-progress').hidden = !progress.total; $('hero-progress-bar').value = progress.percent;
@@ -725,6 +725,8 @@ function renderHero() {
   $('hero-chapter').textContent = heroSeries.ultimo_capitulo ?? `${heroSeries.total_capitulos ?? 0} capítulos en tu biblioteca`;
   $('hero-source').textContent = sourceName(heroSeries.source);
   $('hero-action').replaceChildren(document.createTextNode(heroSeries.ultimo_capitulo_id ? 'Continuar lectura ↗' : 'Empezar esta historia ↗'));
+  $('hero-action').setAttribute('aria-label',`${heroSeries.ultimo_capitulo_id?'Continuar':'Empezar'} ${heroSeries.titulo}`);
+  $('hero-details').setAttribute('aria-label',`Elegir ${heroSeries.titulo}`);
   const cover = $('hero-cover');
   const validCover = isProxyUrl(heroSeries.coverUrl);
   cover.hidden = !validCover; $('hero-fallback').hidden = Boolean(validCover);
@@ -879,6 +881,7 @@ $('library-toggle').addEventListener('click', () => navigateView('library'));
 $('welcome-library').addEventListener('click', () => navigateView('library'));
 $('library-close').addEventListener('click', () => { if (current) setLibrary(false); });
 $('hero-action').addEventListener('click', () => { if (heroSeries) heroSeries.ultimo_capitulo_id ? openChapter(heroSeries.ultimo_capitulo_id) : selectSeries(heroSeries); });
+$('hero-details').addEventListener('click',()=>{if(heroSeries)selectSeries(heroSeries);});
 async function openAddDialog(origin=$('add-toggle')){await setLibrary(true);$('add-status').textContent='';setDialog('add-panel',true);rememberDialogOrigin('add-panel',origin);}
 $('add-toggle').addEventListener('click',()=>openAddDialog());
 $('add-close').addEventListener('click', () => setDialog('add-panel', false));
