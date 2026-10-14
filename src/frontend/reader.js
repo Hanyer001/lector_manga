@@ -5,6 +5,7 @@ import { renderSeriesCards, setGridLoading } from './library-view.js';
 import { enhanceSelects, syncSelectControls } from './ui-controls.js';
 import { initializeDialog, createDetailTabs } from './dialog-ui.js';
 import { changeView } from './view-transitions.js';
+import {homeModel} from './home-model.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
 import { readRecommendationStream } from './discovery-stream.js';
@@ -700,16 +701,16 @@ async function loadLibrary() {
 }
 
 function renderEmptyState() {
-  const empty=libraryLoaded&&!series.some(item=>!item.is_private);
+  const empty=libraryLoaded&&!series.some(activeView==='home'?isPublicReading:item=>!item.is_private);
   $('library-welcome').hidden=!empty||!['home','library'].includes(activeView);
   $('home-content').hidden=empty;
+  $('home-start-guide').hidden=!empty;
   $('series-grid').hidden=empty&&$('series-grid').getAttribute('aria-busy')!=='true';
 }
 
 function sourceName(id) { return sourceCatalog.find(source => source.id === id)?.name ?? id; }
 function renderHero() {
-  const publicWorks=groupWorks(series.filter(isPublicReading));
-  heroSeries = publicWorks.sort((a, b) => (b.ultima_lectura ?? 0) - (a.ultima_lectura ?? 0)).find(item => item.ultimo_capitulo_id) ?? publicWorks[0];
+  heroSeries = homeModel(series).hero;
   $('continue-hero').hidden = !heroSeries;
   if (!heroSeries) { for(const id of ['hero-title','hero-chapter','hero-source'])$(id).textContent='';$('hero-cover').removeAttribute('src');$('hero-backdrop').removeAttribute('src');$('hero-progress').hidden=true;return; }
   $('hero-title').textContent = heroSeries.titulo;
@@ -723,7 +724,7 @@ function renderHero() {
   $('hero-label').textContent = heroSeries.ultimo_capitulo_id ? 'CONTINÚA DONDE LO DEJASTE' : 'UNA HISTORIA PARA EMPEZAR';
   $('hero-chapter').textContent = heroSeries.ultimo_capitulo ?? `${heroSeries.total_capitulos ?? 0} capítulos en tu biblioteca`;
   $('hero-source').textContent = sourceName(heroSeries.source);
-  $('hero-action').replaceChildren(document.createTextNode(heroSeries.ultimo_capitulo_id ? 'Continuar lectura ↗' : 'Elegir capítulo ↗'));
+  $('hero-action').replaceChildren(document.createTextNode(heroSeries.ultimo_capitulo_id ? 'Continuar lectura ↗' : 'Empezar esta historia ↗'));
   const cover = $('hero-cover');
   const validCover = isProxyUrl(heroSeries.coverUrl);
   cover.hidden = !validCover; $('hero-fallback').hidden = Boolean(validCover);
