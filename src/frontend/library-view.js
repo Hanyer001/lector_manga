@@ -79,7 +79,7 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
       if (progress.total) { const bar = document.createElement('progress'); bar.max = 100; bar.value = progress.percent; bar.setAttribute('aria-label', progress.read + ' de ' + progress.total + ' capítulos marcados como leídos'); const count = document.createElement('span'); count.className = 'read-count'; count.textContent = progress.read + ' / ' + progress.total + ' leídos'; section.append(bar, count); }
       card.append(section);
     }
-    if(item.reason){const reason=document.createElement('p');reason.className='recommendation-reason';reason.textContent=item.reason;card.append(reason);}
+    if(item.reason||onFeedback){const reason=document.createElement('p');reason.className='recommendation-reason';reason.textContent=item.reason??'';card.append(reason);}
     const actions = document.createElement('div'); actions.className = 'card-actions'; card.append(actions);
     const action = (text, handler, primary = false) => {
       const button = document.createElement('button'); button.type = 'button'; button.className = `button ${primary ? 'primary' : 'subtle'}`;
