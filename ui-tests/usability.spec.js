@@ -22,11 +22,9 @@ test('biblioteca vacía: bienvenida útil y navegación móvil de cinco accesos'
   await expect(page.getByRole('heading',{name:'Empieza una biblioteca a tu medida.',exact:true})).toBeVisible();
   if(page.viewportSize().width<=768){
     await expect(page.locator('.library-tabs > button:visible')).toHaveCount(5);
-    await page.getByRole('button',{name:'Más',exact:true}).click();
-    await page.locator('[data-more-view="settings"]').click();
+    await page.locator('#show-settings').click();
     await expect(page.locator('#settings-panel')).toBeVisible();
-    await page.getByRole('button',{name:'Más',exact:true}).click();
-    await page.locator('[data-more-view="private"]').click();
+    await page.locator('#show-private').click();
     await expect(page.locator('#private-gate')).toBeVisible();
   }
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
