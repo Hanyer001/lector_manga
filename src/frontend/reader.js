@@ -151,12 +151,15 @@ function applyLibrary(open, { opening = false } = {}) {
   (open ? $('show-saved') : $('reader')).focus({ preventScroll: true });
 }
 
+function rememberDialogOrigin(id, element) {
+  dialogOrigins.set(id,{element,label:element?.getAttribute('aria-label')});
+}
 function setDialog(id, open) {
   const panel = $(id);
   if (panel.open === open) return;
   if (open) {
     for (const other of dialogs) if (other !== id) setDialog(other, false);
-    dialogOrigins.set(id, document.activeElement);
+    rememberDialogOrigin(id, document.activeElement);
   }
   if(open){panel.hidden=false;panel.showModal();}else panel.close();
   syncDialogState(id,open);
@@ -168,7 +171,13 @@ function syncDialogState(id,open) {
   document.body.classList.toggle('modal-open', modalOpen);
   if (id === 'add-panel') $('add-toggle').setAttribute('aria-expanded', String(open));
   if (id === 'more-panel') $('show-more').setAttribute('aria-expanded', String(open));
-  if(!open&&!modalOpen){const origin=dialogOrigins.get(id);if(origin?.isConnected&&origin.getClientRects().length)origin.focus({preventScroll:true});}
+  if(!open&&!modalOpen){
+    const remembered=dialogOrigins.get(id);let origin=remembered?.element;
+    // Guardar puede volver a dibujar la tarjeta: recupera su botón actual.
+    if(!origin?.isConnected&&id==='chapter-controls')origin=[...document.querySelectorAll('#series-grid .series-choice,#private-library .series-choice')].find(button=>button.getAttribute('aria-label')===remembered?.label&&button.getClientRects().length);
+    if(!origin?.isConnected||!origin.getClientRects().length)origin=document.querySelector('nav[aria-label="Navegación principal"] [aria-current="page"]');
+    if(origin?.isConnected&&origin.getClientRects().length)origin.focus({preventScroll:true});
+  }
 }
 
 function saveCache() {
@@ -748,7 +757,7 @@ async function selectSeries(item) {
   cover.onerror = () => { cover.hidden = true; };
   $('picker-status').textContent = 'Cargando capítulos…';
   setDialog('chapter-controls', true);
-  dialogOrigins.set('chapter-controls', origin?.isConnected ? origin : document.querySelector('#series-grid .series-card.selected .series-choice') ?? $('show-saved'));
+  rememberDialogOrigin('chapter-controls', origin?.isConnected ? origin : document.querySelector('#series-grid .series-card.selected .series-choice') ?? $('show-saved'));
   await loadLibraryChapters();
   if ($('chapter-controls').open&&detailTabs.active==='chapters') chapterBrowser.focus();
 }
@@ -869,7 +878,7 @@ $('library-toggle').addEventListener('click', () => navigateView('library'));
 $('welcome-library').addEventListener('click', () => navigateView('library'));
 $('library-close').addEventListener('click', () => { if (current) setLibrary(false); });
 $('hero-action').addEventListener('click', () => { if (heroSeries) heroSeries.ultimo_capitulo_id ? openChapter(heroSeries.ultimo_capitulo_id) : selectSeries(heroSeries); });
-async function openAddDialog(origin=$('add-toggle')){await setLibrary(true);$('add-status').textContent='';setDialog('add-panel',true);dialogOrigins.set('add-panel',origin);}
+async function openAddDialog(origin=$('add-toggle')){await setLibrary(true);$('add-status').textContent='';setDialog('add-panel',true);rememberDialogOrigin('add-panel',origin);}
 $('add-toggle').addEventListener('click',()=>openAddDialog());
 $('add-close').addEventListener('click', () => setDialog('add-panel', false));
 $('picker-close').addEventListener('click', () => setDialog('chapter-controls', false));
