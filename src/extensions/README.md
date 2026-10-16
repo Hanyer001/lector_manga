@@ -23,6 +23,8 @@ Actualización del 16 de octubre de 2026:
 
 **Tipografías:** Inter, Plus Jakarta Sans y JetBrains Mono se sirven desde `src/frontend/fonts/`, con sus licencias OFL. Las dos nuevas fuentes son WOFF2 latinas de 27.348 y 40.404 bytes; no se consulta Google Fonts en tiempo de ejecución.
 
+**Comprobación en producción:** AniList y la búsqueda de ComicK respondieron correctamente a través de la API de Render. Ikigai devolvió HTTP 403 tanto al consultar fichas como capítulos desde ese alojamiento, y su web no permite lectura directa mediante CORS. Su adaptador conserva el funcionamiento local verificado, pero no se anuncia como fuente activa en Render. No se utilizan proxies de terceros ni se eluden sus controles de acceso.
+
 | ID | Sitio | Adaptador | Condiciones |
 |---|---|---|---|
 | manhwaweb | ManhwaWeb | Activo, API JSON | Español; capítulos alojados en el propio sitio; conserva versiones por URL |
