@@ -1,3 +1,4 @@
+import {orderedChapters} from '../frontend/chapter-order.js';
 import { ApiError, httpUrl, positiveId } from '../backend/errors.js';
 import { normalizeMetadata, readingStates } from './metadata.js';
 import { createDiscoveryStore } from './discovery.js';
@@ -159,9 +160,9 @@ export function createDatabaseStore(db, openDatabase) {
             url_origen: httpUrl(chapter.url), numero: chapter.number });
         });
         db.prepare('UPDATE Series SET last_sync_at=? WHERE id=?').run(first_seen_at, serie_id);
-        return saved;
+        return orderedChapters(saved);
       }),
-      listChapters(serieId) { return chaptersBySeries.all(getSeries(serieId).id); },
+      listChapters(serieId) { return orderedChapters(chaptersBySeries.all(getSeries(serieId).id)); },
       getProgress(serieId) { return progressBySeries.get(getSeries(serieId).id) ?? null; },
       updateProgress: db.transaction(({ serie_id, capitulo_id, scroll_position_y, page_index = null, page_fraction = null, expected_timestamp }) => {
         serie_id = getSeries(serie_id).id;

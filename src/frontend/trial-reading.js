@@ -1,5 +1,6 @@
+import {orderedChapters,chapterNumber} from './chapter-order.js';
 export function trialChapters(items=[]) {
-  return items.filter(item=>item&&typeof item.url==='string').map(item=>({...item,title:item.title??item.titulo??'Capítulo',number:item.number??item.numero??null,id:'trial:'+item.url})).sort((a,b)=>a.number===null&&b.number===null?0:a.number===null?1:b.number===null?-1:a.number-b.number);
+  return orderedChapters(items.filter(item=>item&&typeof item.url==='string').map(item=>({...item,title:item.title??item.titulo??'Capítulo',number:chapterNumber(item),id:'trial:'+item.url})));
 }
 export function matchingTrialChapter(items,number) {
   if(!Number.isFinite(number))return {index:null,message:''};

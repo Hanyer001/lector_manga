@@ -1,3 +1,4 @@
+import {compareChapters,chapterGaps} from './chapter-order.js';
 const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 
 export function chapterEntries(chapters, { query = '', order = 'asc', filter = 'all', lastId } = {}) {
@@ -7,8 +8,7 @@ export function chapterEntries(chapters, { query = '', order = 'asc', filter = '
     const searchable = normalize(`${chapter.titulo ?? chapter.title} ${chapter.numero ?? chapter.number ?? ''}`);
     return words.every(word => searchable.includes(word)) && (filter === 'all' || filter === 'read' && read || filter === 'unread' && !read || filter === 'last' && String(chapter.id) === String(lastId));
   }).sort((a, b) => {
-    const number = row => Number.isFinite(Number(row.numero ?? row.number)) && (row.numero ?? row.number) != null ? Number(row.numero ?? row.number) : Infinity;
-    const difference = number(a.chapter) - number(b.chapter);
+    const difference = compareChapters(a.chapter,b.chapter);
     const stable = Number.isNaN(difference) || difference === 0 ? a.index - b.index : difference;
     return order === 'desc' ? -stable : stable;
   });
@@ -21,6 +21,7 @@ export function createChapterBrowser(container, { onChoose, temporary = false } 
   container.innerHTML = `<div class="chapter-browser-tools"><label for="${prefix}-query" class="sr-only">Buscar capítulo</label><input id="${prefix}-query" type="search" placeholder="Buscar capítulo o número…" maxlength="200"><label for="${prefix}-order" class="sr-only">Orden de capítulos</label><select id="${prefix}-order"><option value="asc">Primeros capítulos</option><option value="desc">Últimos capítulos</option></select><label for="${prefix}-filter" class="sr-only">Estado del capítulo</label><select id="${prefix}-filter"><option value="all">Todos</option><option value="unread">Pendientes</option><option value="read">Leídos</option><option value="last">Último abierto</option></select></div><p class="chapter-count small muted" role="status" aria-live="polite"></p><ul class="chapter-list" aria-label="Capítulos disponibles"></ul><button class="button chapter-more" type="button" hidden>Mostrar más capítulos</button>`;
   const query = container.querySelector('input'), [order, filter] = container.querySelectorAll('select');
   const list = container.querySelector('ul'), count = container.querySelector('.chapter-count'), more = container.querySelector('.chapter-more');
+  const gapsNote=document.createElement('p');gapsNote.className='chapter-gaps small muted';gapsNote.setAttribute('role','status');count.after(gapsNote);
   const reverse=document.createElement('button');reverse.type='button';reverse.className='button chapter-order-toggle';reverse.id=prefix+'-reverse';
   reverse.setAttribute('aria-label','Invertir orden de capítulos');
   order.hidden=true;order.after(reverse);
@@ -31,6 +32,8 @@ export function createChapterBrowser(container, { onChoose, temporary = false } 
     const scrollTop = list.scrollTop;
     const entries = chapterEntries(chapters, { query: query.value, order: order.value, filter: filter.value, lastId });
     list.replaceChildren();
+    const gaps=chapterGaps(chapters);gapsNote.hidden=busy||!gaps.length;
+    gapsNote.textContent=gaps.length?`La lista recibida tiene saltos: ${gaps.slice(0,4).map(([from,to])=>`${from} → ${to}`).join(', ')}${gaps.length>4?'…':''}. Actualiza los capítulos o consulta otra fuente; la numeración puede variar entre ediciones.`:'';
     count.textContent = busy ? 'Cargando capítulos…' : chapters.length ? `${entries.length} de ${chapters.length} capítulos` : 'Todavía no hay capítulos disponibles.';
     for (const { chapter, index } of entries.slice(0, limit)) {
       const row = document.createElement('li'), button = document.createElement('button');

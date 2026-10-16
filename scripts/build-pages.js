@@ -1,6 +1,7 @@
 import { cp, mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import './prepare-client.js';
+import CleanCSS from 'clean-css';
 const root = new URL('../', import.meta.url), output = new URL('dist/pages/', root);
 function publicOrigin(value, name) {
   const url=new URL(value);
@@ -15,6 +16,17 @@ await mkdir(output,{recursive:true});
 await cp(new URL('src/frontend/',root),output,{recursive:true});
 await writeFile(new URL('config.js',output),'window.LECTOR_CONFIG = '+JSON.stringify(config).replaceAll('<','\\u003c')+';\n');
 await writeFile(new URL('.nojekyll',output),'');
+// Conserva exactamente la cascada de desarrollo en una sola petición de producción.
+const htmlUrl=new URL('index.html',output),html=await readFile(htmlUrl,'utf8');
+const stylesheet=/<link rel="stylesheet" href="\.\/([^"?]+\.css)">/g;
+const sheets=[...html.matchAll(stylesheet)];
+if(!sheets.length)throw new Error('No se encontraron las hojas de estilo.');
+const css=await Promise.all(sheets.map(match=>readFile(new URL(match[1],output),'utf8')));
+const bundled=new CleanCSS({level:1,rebase:false}).minify(css.join('\n'));
+if(bundled.errors.length)throw new Error(bundled.errors.join('\n'));
+await writeFile(new URL('app.bundle.css',output),bundled.styles);
+let first=true;
+await writeFile(htmlUrl,html.replace(stylesheet,()=>{if(!first)return '';first=false;return '<link rel="stylesheet" href="./app.bundle.css">';}));
 // Cambia la caché de interfaz al publicar una nueva versión; nunca se cachean datos personales.
 const {createHash}=await import('node:crypto');
 const files=(await readdir(output)).filter(name=>/\.(js|css|html)$/.test(name)).sort();
