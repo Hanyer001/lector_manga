@@ -9,7 +9,7 @@ test.afterEach(async()=>{await demo.close();});
 test('conexión anticipada visible, sin credenciales, y semáforo según consultas reales',async({page})=>{
   let release;const gate=new Promise(resolve=>{release=resolve;});let ping;
   await page.route('**/api/health',async route=>{ping=route.request();await gate;await route.fulfill({json:{ok:true},headers:{'Access-Control-Allow-Origin':new URL(demo.web).origin}});});
-  await page.goto(demo.web+'#home');await expect(page.locator('#home-panel')).toBeVisible();
+  await page.goto(demo.web+'?qa_user=b#home');await expect(page.locator('#home-panel')).toBeVisible();
   await expect(page.locator('#catalog-connection-label')).toHaveText('Despertando catálogos…');
   expect(ping.headers().authorization).toBeUndefined();expect(ping.headers()['x-private-token']).toBeUndefined();
   release();await expect(page.locator('#catalog-connection-label')).toHaveText('Catálogos en línea');
