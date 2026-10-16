@@ -8,6 +8,7 @@
   <title>Lector · Tu biblioteca</title>
   <script src="./config.js"></script>
   <script src="./appearance.js"></script>
+  <script src="./catalog-status.js"></script>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -36,6 +37,7 @@
   </header>
 
   <main id="main-content" tabindex="-1">
+  <details id="recommend-warnings" class="catalog-health" hidden><summary>Estado de los catálogos <span id="catalog-connection-label" role="status" aria-live="polite">Despertando catálogos…</span></summary><div class="catalog-health-body"><p id="catalog-connection-copy" class="small muted"></p><ul id="catalog-source-status" class="catalog-source-status" aria-label="Estado por fuente"></ul><div id="recommend-warnings-list" hidden></div><button id="catalog-retry" type="button" class="button subtle" hidden>Reintentar conexión</button></div></details>
   <p id="startup-status" role="status">Preparando tu biblioteca…</p>
   <noscript>Activa JavaScript para abrir tu biblioteca y leer capítulos.</noscript>
   <section id="library" class="library" aria-labelledby="library-title" hidden>
@@ -116,7 +118,6 @@
       <details id="discovery-result-options" class="discovery-result-options"><summary>Filtrar y ordenar resultados</summary><div class="discovery-seen-tools"><label><input id="rec-only-new" type="checkbox"> Solo nuevas · ocultar fichas ya abiertas</label><button id="rec-reset-seen" class="button subtle" type="button">Volver a mostrar las vistas</button><span id="rec-seen-status" class="small muted" role="status"></span></div>
       <div id="recommend-tools" class="discovery-result-tools" hidden><label class="sr-only" for="rec-result-query">Buscar en las recomendaciones</label><input id="rec-result-query" type="search" maxlength="200" placeholder="Buscar entre estas historias…"><label class="sr-only" for="rec-result-sort">Ordenar recomendaciones</label><select id="rec-result-sort"><option value="affinity">Afinidad recomendada</option><option value="title">Título · A–Z</option><option value="source">Por catálogo</option></select></div>
       </details><div id="recommend-source-results" class="recommend-source-results tag-chips" aria-label="Resultados por catálogo" hidden></div><div id="recommend-catalog-hint" class="discovery-catalog-hint" hidden><p id="recommend-catalog-copy" class="small muted"></p><button id="rec-explore-catalog" class="button subtle" type="button">Explorar solo por mis filtros</button></div>
-      <details id="recommend-warnings" class="discovery-details source-warnings" hidden><summary>Estado de los catálogos</summary><div id="recommend-warnings-list"></div></details>
       <div id="recommend-results" class="series-grid" aria-label="Historias recomendadas" aria-busy="false"><p class="series-empty">Elige tus géneros o descubre historias a partir de tus lecturas.</p></div><div class="recommend-more-row"><button id="recommend-more" type="button" class="button" hidden>Mostrar más recomendaciones</button></div><details class="feedback-history"><summary>Mis preferencias y descartes</summary><p class="small muted">Marca lo que te gusta o descarta historias desde cada portada para afinar tus próximas sugerencias.</p><div id="recommend-feedback-list"></div><button id="recommend-reset" class="button subtle" type="button">Reiniciar mis gustos</button></details><button id="discover-explore" class="button subtle" type="button">¿Buscas un título concreto? Ir a Buscar ↗</button>
     </section>
     <section id="private-panel" aria-label="Biblioteca privada" hidden>

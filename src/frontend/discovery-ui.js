@@ -31,7 +31,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     $('rec-result-sort').options[0].textContent=collection==='newest'?'Novedades del catálogo':'Afinidad recomendada';
   }
   for(const button of document.querySelectorAll('[data-rec-collection]'))button.addEventListener('click',()=>{collection=button.dataset.recCollection;drawCollection();changed();recommend();});
-  const changed=()=>{abort();visibleLimit=24;nextPages={};appending=false;results=[];providers=[];phase='idle';lastMessage='';$('recommend-warnings').hidden=true;render();drawSources();$('recommend-reason').textContent=tags.genres.has('adult')?'Género +18 seleccionado · MangaDex y ManhwaWeb. Pulsa Aplicar filtros.':'Filtros preparados. Pulsa Aplicar filtros para actualizar las sugerencias.';};
+  const changed=()=>{abort();visibleLimit=24;nextPages={};appending=false;results=[];providers=[];phase='idle';lastMessage='';$('recommend-warnings-list').hidden=true;render();drawSources();$('recommend-reason').textContent=tags.genres.has('adult')?'Género +18 seleccionado · MangaDex y ManhwaWeb. Pulsa Aplicar filtros.':'Filtros preparados. Pulsa Aplicar filtros para actualizar las sugerencias.';};
   const modeDescriptions={personal:'Prioriza coincidencias con tus gustos. Si eliges filtros, también muestra historias para explorar y explica la diferencia.',recent:'Relaciona las cinco historias que has leído más recientemente y da prioridad a la última.',similar:'Busca coincidencias concretas con la obra elegida. Compartir solo Drama o Acción no es suficiente.',genres:'Combina géneros y temas, y excluye lo que prefieras evitar.',diverse:'Busca géneros y temas fuera de tus lecturas habituales, respetando tus filtros.'};
   function drawMode(){const mode=$('rec-mode').value;$('rec-seed-label').hidden=mode!=='similar';$('rec-mode-description').textContent=modeDescriptions[mode];if(mode==='genres')$('rec-customize').open=true;for(const button of document.querySelectorAll('[data-rec-mode]'))button.setAttribute('aria-pressed',String(button.dataset.recMode===mode));}
   const prepareSimilar=()=>{tags.genres=new Set([...tags.genres].filter(key=>key==='adult'));tags.themes.clear();drawTags();};
@@ -123,7 +123,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     const labels={personal:result.personalized?'Según tus gustos y biblioteca.':'Selección general para empezar.',recent:'A partir de tus lecturas recientes.',similar:'Coincidencias con la historia elegida.',genres:'Según los filtros que elegiste.',diverse:'Para salir de tus lecturas habituales.'};
     const description=collection==='newest'?'Incorporaciones recientes del catálogo.':collection==='completed'?'Finalizadas según su catálogo.':labels[$('rec-mode').value];
     $('recommend-reason').textContent=waiting?`${results.length?`${results.length} historias disponibles · `:''}consultando ${waiting} ${waiting===1?'catálogo':'catálogos'}…`:lastMessage||`${results.length} historias · ${contributing} ${contributing===1?'catálogo':'catálogos'}. ${description}`;
-    $('recommend-warnings').hidden=!result.warnings?.length;$('recommend-warnings-list').replaceChildren(...(result.warnings??[]).map(message=>text('p',message,'small muted')));
+    $('recommend-warnings-list').hidden=!result.warnings?.length;$('recommend-warnings-list').replaceChildren(...(result.warnings??[]).map(message=>text('p',message,'small muted')));
   }
   async function recommend(event,{more=false}={}) {
     event?.preventDefault();
@@ -142,7 +142,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     if(!more&&!refresh&&event?.type!=='submit'&&cached?.expires>Date.now()){phase='complete';applyResult(cached.result);return;}
     phase='loading';lastMessage='';const version=generation,controller=request=beginQuery();
     $('load-recommendations').disabled=true;$('recommend-submit').disabled=true;$('recommend-results').setAttribute('aria-busy','true');$('recommend-reason').textContent=`Buscando en ${sourceSelection?.size??availableSources().length} catálogos…`;
-    $('recommend-warnings').hidden=true;render();
+    $('recommend-warnings-list').hidden=true;render();
     try {
       if(event?.type==='submit')await api('/api/discovery',{method:'PUT',body:JSON.stringify(preferences),signal:controller.signal});
       if(!more){resultSource='';$('rec-result-query').value='';}
@@ -168,7 +168,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
   $('recommend-clear').addEventListener('click',async()=>{abort();writeFilters({});changed();try{await api('/api/discovery',{method:'PUT',body:JSON.stringify(filters())});$('recommend-reason').textContent='Filtros limpiados; tus valoraciones se conservan.';}catch(error){$('recommend-reason').textContent=error.message;}finally{$('load-recommendations').disabled=$('recommend-submit').disabled=!availableSources().length;}});
   $('recommend-reset').addEventListener('click',async()=>{
     if($('recommend-reset').dataset.confirm!=='yes'){$('recommend-reset').dataset.confirm='yes';$('recommend-reset').textContent='Confirmar reinicio de gustos';$('recommend-reason').textContent='Se borrarán notas, gustos y descartes. Tu biblioteca, estados de lectura y progreso se conservarán.';return;}
-    abort();try{await api('/api/discovery',{method:'DELETE'});viewed.clear();captureViewed();results=[];providers=[];phase='idle';$('recommend-warnings').hidden=true;writeFilters({});render();await reload();$('recommend-reason').textContent='Gustos y descartes reiniciados. Tus lecturas se conservan.';}catch(error){$('recommend-reason').textContent=error.message;}finally{$('recommend-reset').dataset.confirm='';$('recommend-reset').textContent='Reiniciar mis gustos';$('load-recommendations').disabled=false;$('recommend-submit').disabled=false;}
+    abort();try{await api('/api/discovery',{method:'DELETE'});viewed.clear();captureViewed();results=[];providers=[];phase='idle';$('recommend-warnings-list').hidden=true;writeFilters({});render();await reload();$('recommend-reason').textContent='Gustos y descartes reiniciados. Tus lecturas se conservan.';}catch(error){$('recommend-reason').textContent=error.message;}finally{$('recommend-reset').dataset.confirm='';$('recommend-reset').textContent='Reiniciar mis gustos';$('load-recommendations').disabled=false;$('recommend-submit').disabled=false;}
   });
   function renderFeedback() {
     $('recommend-feedback-list').replaceChildren();
@@ -231,5 +231,5 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     event.preventDefault();if(!selected)return;const id=selected.id,workId=selected.work_id;$('edition-add').disabled=true;
     try{await api('/api/series',{method:'POST',body:JSON.stringify({url_origen:$('edition-url').value,work_id:workId})});$('edition-url').value='';await reload();await select(state().series.find(s=>s.id===id));$('edition-status').textContent='Nueva fuente vinculada. Selecciónala y actualiza sus capítulos.';}catch(error){$('edition-status').textContent=error.message;}finally{$('edition-add').disabled=false;}
   });
-  return {update,organize,abort,activate(){if(!attempted&&(collection!=='recommendations'||$('rec-mode').value!=='similar'))recommend();},clear(){abort();extras.clear();collection='recommendations';drawCollection();viewed.clear();hiddenViewed.clear();$('rec-only-new').checked=false;initialized=false;selected=null;transfer=null;modeCache.clear();profileVersion='';attempted=false;phase='idle';results=[];providers=[];$('rec-result-query').value='';$('recommend-warnings').hidden=true;$('recommend-warnings-list').replaceChildren();render();$('recommend-feedback-list').replaceChildren();$('recommend-reason').textContent='Elige tus géneros o descubre historias a partir de tus lecturas.';}};
+  return {update,organize,abort,activate(){if(!attempted&&(collection!=='recommendations'||$('rec-mode').value!=='similar'))recommend();},clear(){abort();extras.clear();collection='recommendations';drawCollection();viewed.clear();hiddenViewed.clear();$('rec-only-new').checked=false;initialized=false;selected=null;transfer=null;modeCache.clear();profileVersion='';attempted=false;phase='idle';results=[];providers=[];$('rec-result-query').value='';$('recommend-warnings-list').hidden=true;$('recommend-warnings-list').replaceChildren();render();$('recommend-feedback-list').replaceChildren();$('recommend-reason').textContent='Elige tus géneros o descubre historias a partir de tus lecturas.';}};
 }
