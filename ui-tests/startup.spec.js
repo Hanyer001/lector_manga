@@ -9,10 +9,12 @@ test('inicio estático oculta vistas y diálogos antes de ejecutar la aplicació
   await page.goto(demo.web+'#home');
   await expect(page.getByRole('main')).toHaveCount(1);
   await expect(page.locator('#startup-status')).toBeVisible();
+  await expect(page.locator('.library-tabs')).toHaveAttribute('inert','');
   for(const id of ['library','saved-panel','reader','account-private-dialog','vault-recovery-dialog'])await expect(page.locator('#'+id)).toBeHidden();
 });
 test('saltar al contenido enfoca la vista actual sin navegar ni cambiar el hash',async({page})=>{
   await page.goto(demo.web+'#home');await expect(page.locator('#home-panel')).toBeVisible();
+  await expect(page.locator('.library-tabs')).not.toHaveAttribute('inert','');
   for(const [button,panel,hash] of [['show-home','home-panel','#home'],['show-settings','settings-panel','#settings']]){
     await page.locator('#'+button).click();await expect(page.locator('#'+panel)).toBeVisible();
     await page.locator('.skip-link').focus();await page.locator('.skip-link').press('Enter');
