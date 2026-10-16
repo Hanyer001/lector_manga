@@ -267,7 +267,7 @@ export function createApp({ database: localDatabase, sources = defaultSources, t
       return { index: image.index, originalUrl: url, referer,
         url: `/api/image?ticket=${encodeURIComponent(ticket)}` };
     });
-    res.json({ source: series.source, chapter: { ...result.chapter, id: chapter.id, serie_id: series.id,
+    res.json({ source: series.source, chapter: { ...result.chapter, id: chapter.id, serie_id: series.id, aligned_number:chapter.aligned_number,
       privateReading: Boolean(database.getSeries(series.id).is_private) }, images });
   });
   app.get('/api/series/:id/progress', (req, res) => res.json(database.getProgress(req.params.id)));
