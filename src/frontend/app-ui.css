@@ -13,6 +13,10 @@
 body:not(.library-open) .catalog-health,body.vault-background .catalog-health { display:none; }
 @media(max-width:767px){#catalog-connection-label{display:flex;margin:6px 0 0 14px;}}
 .page-slot[data-state='retrying'] .page-number { color:var(--accent-text); }
+[data-state='loading'] > .catalog-dot { background:#dca642; }
+#startup-status,#startup-retry { margin:16px; }
+.reader-tap-feedback { position:fixed; z-index:90; left:50%; top:50%; transform:translate(-50%,-50%); padding:10px 16px; border:1px solid var(--reader-line); border-radius:999px; background:var(--reader-glass); backdrop-filter:blur(8px); color:var(--text-on-image); font-size:.8rem; pointer-events:none; box-shadow:var(--floating-shadow); }
+.reader-tap-feedback[hidden] { display:none; }
 .select-control { display:flex; gap:6px; min-width:0; }
 .control-option { appearance:none; flex:none; min-height:44px; padding:9px 14px; border:1px solid var(--border-subtle); border-radius:999px; color:var(--muted); background:var(--panel); font:inherit; font-size:.8rem; cursor:pointer; transition:background .18s,border-color .18s,box-shadow .18s,color .18s; }
 .control-option:hover { border-color:var(--accent-text); color:var(--text); }

@@ -17,9 +17,9 @@ export function showRecoveryKey(key) {
   if(recoveryPromise)return recoveryPromise;
   const dialog=$('vault-recovery-dialog'),field=$('vault-recovery-key');field.value=key;
   recoveryPromise=new Promise(resolve=>{
-    const finish=approved=>{field.value='';dialog.close();$('vault-recovery-confirm').removeEventListener('click',confirm);dialog.removeEventListener('cancel',cancel);document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',hide);recoveryPromise=null;resolve(approved);};
+    const finish=approved=>{field.value='';dialog.close();dialog.hidden=true;$('vault-recovery-confirm').removeEventListener('click',confirm);dialog.removeEventListener('cancel',cancel);document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',hide);recoveryPromise=null;resolve(approved);};
     const confirm=()=>finish(true),cancel=event=>event.preventDefault(),hide=()=>{if(document.visibilityState==='hidden')finish(false);};
-    $('vault-recovery-confirm').addEventListener('click',confirm);dialog.addEventListener('cancel',cancel);document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',hide);dialog.showModal();
+    $('vault-recovery-confirm').addEventListener('click',confirm);dialog.addEventListener('cancel',cancel);document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',hide);dialog.hidden=false;dialog.showModal();
   });return recoveryPromise;
 }
 export function initializeRecoveryDownload() {

@@ -6,6 +6,7 @@ export function createAccountUI({ api, reload, navigate, beforeSignOut = async (
   let privateConfirmation, privateConfigured=false,backupMode=false,pendingBackup;
   function status(message) { $('account-status').textContent = message; }
   const privateDialog=$('account-private-dialog');
+  privateDialog.addEventListener('close',()=>{if(!privateDialog.open)privateDialog.hidden=true;});
   function finishConfirmation(approved=false) {
     const resolve=privateConfirmation;privateConfirmation=null;
     backupMode=false;
@@ -31,7 +32,7 @@ export function createAccountUI({ api, reload, navigate, beforeSignOut = async (
     try{return await action();}catch(error){
       if(error.code!=='BACKUP_PASSWORD_REQUIRED'||!pendingBackup)throw error;
       backupMode=true;$('account-private-recovery-label').hidden=false;$('account-private-title').textContent='Desbloquea el archivo cifrado';$('account-private-confirm-label').hidden=true;$('account-private-confirm').required=false;$('account-private-status').textContent='Introduce la contraseña que protegía este archivo cuando lo exportaste. Se utiliza únicamente en este navegador.';
-      const answer=await new Promise(resolve=>{privateConfirmation=resolve;privateDialog.showModal();$('account-private-pin').focus();});
+      const answer=await new Promise(resolve=>{privateConfirmation=resolve;privateDialog.hidden=false;privateDialog.showModal();$('account-private-pin').focus();});
       if(!answer)throw new Error('Importación cancelada.');return answer.result;
     }
   }
@@ -45,7 +46,7 @@ export function createAccountUI({ api, reload, navigate, beforeSignOut = async (
       $('account-private-confirm-label').hidden=privateConfigured;$('account-private-confirm').required=!privateConfigured;
       $('account-private-recovery-label').hidden=!encryptedPrivate||!privateConfigured;
       $('account-private-status').textContent='';
-      const approved=await new Promise(resolve=>{privateConfirmation=resolve;privateDialog.showModal();$('account-private-pin').focus();});
+      const approved=await new Promise(resolve=>{privateConfirmation=resolve;privateDialog.hidden=false;privateDialog.showModal();$('account-private-pin').focus();});
       if(!approved)throw new Error('Transferencia cancelada.');
       try { return await runTransfer(action); }
       finally { await api('/api/private/lock',{method:'POST',keepalive:true}).catch(()=>{}); }

@@ -6,6 +6,8 @@ export function createReaderControls({change,jump,step,library,close,active}) {
   try {preferences=normalizeReaderPreferences(JSON.parse(localStorage.getItem(key)||'{}'));} catch {preferences={...readerDefaults};}
   let visible=false, timer, pointer, lastUpdate,guideTimer;
   const guide=$('reader-touch-guide');
+  const feedback=document.createElement('div');feedback.className='reader-tap-feedback';feedback.hidden=true;feedback.setAttribute('role','status');$('reader').append(feedback);let feedbackTimer;
+  function showTapFeedback(message){clearTimeout(feedbackTimer);feedback.textContent=message;feedback.hidden=false;feedbackTimer=setTimeout(()=>{feedback.hidden=true;},650);}
   function hideTouchGuide(){clearTimeout(guideTimer);guide.hidden=true;}
   function showTouchGuide(){
     hideTouchGuide();
@@ -59,7 +61,8 @@ export function createReaderControls({change,jump,step,library,close,active}) {
   $('page-jump').addEventListener('input',()=>jump(Number($('page-jump').value)-1));
   function tap(action){
     if(!active())return;
-    if(action==='toggle'){setVisible(!visible);return;}
+    if(action==='toggle'){setVisible(!visible);showTapFeedback(visible?'Controles visibles':'Controles ocultos');return;}
+    showTapFeedback(action==='previous'?'← Anterior':'Siguiente →');
     const direction=action==='previous'?-1:1;
     if(preferences.mode==='paged'){
       const pageButton=$(direction<0?'page-back':'page-forward');
@@ -87,7 +90,7 @@ export function createReaderControls({change,jump,step,library,close,active}) {
   });
   refresh();
   return {get preferences(){return preferences;},setVisible,showTouchGuide,
-    activate(show=true){document.body.classList.toggle('reader-active',active());if(!active())hideTouchGuide();setVisible(show);},
+    activate(show=true){document.body.classList.toggle('reader-active',active());if(!active()){hideTouchGuide();clearTimeout(feedbackTimer);feedback.hidden=true;}setVisible(show);},
     update({index,total,title,series,previous,next,read,busy}) {
       const signature=JSON.stringify([index,total,title,series,previous,next,read,busy,preferences.mode,preferences.direction]);if(signature===lastUpdate)return;lastUpdate=signature;
       $('overlay-title').textContent=title;$('overlay-series').textContent=series;

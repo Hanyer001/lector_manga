@@ -20,7 +20,7 @@ test('dialog nativo: pestañas, teclado, organización y cierre con Escape o fon
   await expect(page.getByRole('heading',{name:'Una obra, varias fuentes',exact:true})).toBeVisible();
   await dialog.getByRole('tab',{name:'Organizar',exact:true}).click();
   await expect(page.locator('#series-private-toggle')).toBeVisible();
-  await page.locator('#series-reading-state').selectOption('on_hold');await page.locator('#save-series-library').click();
+  await selectControl(page,'series-reading-state','on_hold').click();await page.locator('#save-series-library').click();
   await expect(page.locator('#series-edit-status')).toContainText('guardad');
   await dialog.press('Escape');await expect(dialog).toBeHidden();await expect(choose).toBeFocused();
   await expect(page.locator('body')).not.toHaveClass(/modal-open/);

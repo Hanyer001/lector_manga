@@ -87,6 +87,7 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('series-reading-state').value=item.reading_state??'planned';$('series-genres').value=metadataOriginal.genres.join(', ');$('series-authors').value=metadataOriginal.authors.join(', ');
     $('series-themes').value=metadataOriginal.themes.join(', ');
     $('series-publication').value=metadataOriginal.status;$('series-country').value=metadataOriginal.country??'';
+    syncSelectControls('series-reading-state');syncSelectControls('series-publication');
     if(metadataOriginal.country&&!$('series-country').value){$('series-country').add(new Option(metadataOriginal.country,metadataOriginal.country));$('series-country').value=metadataOriginal.country;}
     $('picked-description').textContent=item.description??'';$('series-edit-status').textContent='';
     $('series-folders').replaceChildren(text('legend','Carpetas'));
@@ -123,6 +124,18 @@ export function createShell({ preview, api, state, navigate, select, resume, add
       label.append(input,text('span',source.name),text('p',source.enabled?[(source.note||'Catálogo activo · búsqueda por título'),languages].filter(Boolean).join(' · '):(source.reason||'Pendiente de integración')));
       $('source-hub').append(label);
     }
+    renderAdultNote();
+  }
+  function selectedSearchSources(){
+    const selection=$('search-source').value,adult=$('search-genre').value==='adult';
+    const checked=new Set([...$('source-hub').querySelectorAll('input:checked')].map(input=>input.value));
+    return state().sources.filter(source=>source.enabled&&source.capabilities.search&&(!adult||source.capabilities.adult)&&(selection==='all'||selection==='selected'&&checked.has(source.id)||selection===source.id));
+  }
+  function renderAdultNote(){
+    const note=$('search-genre-note');note.hidden=$('search-genre').value!=='adult';
+    if(note.hidden){note.textContent='';return;}
+    const names=selectedSearchSources().map(source=>source.name);
+    note.textContent=names.length?'Se buscan obras clasificadas +18 en: '+names.join(', ')+'.':'Ninguna de las fuentes seleccionadas admite búsqueda +18. Elige una fuente compatible.';
   }
   function renderSearchGroup(group) {
     if(!group.element.isConnected)return;
@@ -135,20 +148,23 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     group.retry.hidden=!group.error;
   }
   async function fetchGroup(group,controller,more=false) {
-    group.loading=true;group.error=null;renderSearchGroup(group);
+    group.loading=true;group.error=null;window.lectorCatalogs?.recordSource(group.source,'loading');renderSearchGroup(group);
     try {const result=group.adult?(await api('/api/adult/catalog',{method:'POST',body:JSON.stringify({query:group.query,source:group.source,page:more?group.nextPage:0}),signal:controller.signal})).sources[0]:await api('/api/sources/'+encodeURIComponent(group.source)+'/search?'+new URLSearchParams({q:group.query,page:more?group.nextPage:0}),{signal:controller.signal});
       if(result.error)throw new Error(result.error);
       if(controller.signal.aborted||group.generation!==searchGeneration)return;
       const existing=new Set(more?group.items.map(item=>item.url):[]);group.items=[...(more?group.items:[]),...result.results.filter(item=>!existing.has(item.url))];group.nextPage=result.nextPage;
     }catch(error){if(group.generation===searchGeneration)group.error=controller.signal.aborted?'Consulta cancelada.':error.message;}
-    finally{if(group.generation===searchGeneration){group.loading=false;renderSearchGroup(group);}}
+    finally{if(group.generation===searchGeneration){group.loading=false;window.lectorCatalogs?.recordSource(group.source,controller.signal.aborted?'pending':group.error?'error':'ok');renderSearchGroup(group);renderSearchSummary(controller);}}
+  }
+  function renderSearchSummary(controller){
+    const count=searchGroups.reduce((n,g)=>n+g.items.length,0),waiting=searchGroups.filter(g=>g.loading).length,errors=searchGroups.filter(g=>g.error).length;
+    $('search-status').textContent=controller.signal.aborted?'Búsqueda cancelada.':`${count} resultados · ${waiting?`${waiting} ${waiting===1?'fuente pendiente':'fuentes pendientes'} · `:''}${errors} ${errors===1?'fuente':'fuentes'} con error.`;
   }
   async function search() {
     searchAbort?.abort();const generation=++searchGeneration;const controller=searchAbort=beginQuery();
-    const query=$('search-query').value.trim();const selection=$('search-source').value,adult=$('search-genre').value==='adult';
-    const active=state().sources.filter(source=>source.enabled&&source.capabilities.search&&(!adult||source.capabilities.adult));
-    const ids=(selection==='all'?active.map(s=>s.id):selection==='selected'?[...$('source-hub').querySelectorAll('input:checked')].map(input=>input.value):[selection]).filter(id=>active.some(s=>s.id===id));
-    if((!query&&!adult)||!ids.length){$('search-status').textContent=adult?'Selecciona MangaDex o ManhwaWeb para buscar +18.':'Escribe un título y selecciona al menos una fuente.';endQuery(controller);return;}
+    const query=$('search-query').value.trim(),adult=$('search-genre').value==='adult';
+    renderAdultNote();const ids=selectedSearchSources().map(source=>source.id);
+    if((!query&&!adult)||!ids.length){$('search-status').textContent=adult?'Selecciona al menos una fuente compatible con +18.':'Escribe un título y selecciona al menos una fuente.';endQuery(controller);return;}
     $('search-results').replaceChildren();$('search-results').classList.add('multi-results');$('search-more').hidden=true;
     searchGroups=ids.map(source=>{const element=document.createElement('section');element.className='search-group';const status=text('p','En espera…','small muted');status.setAttribute('role','status');const grid=document.createElement('div');grid.className='series-grid';
       const more=text('button','Más resultados de '+sourceName(source),'button');more.type='button';more.hidden=true;const retry=text('button','Reintentar '+sourceName(source),'button');retry.type='button';retry.hidden=true;
@@ -160,9 +176,7 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('search-status').textContent=`Buscando en ${ids.length} ${ids.length===1?'fuente':'fuentes'}…`;
     const worker=async()=>{while(cursor<searchGroups.length&&!controller.signal.aborted){const group=searchGroups[cursor++];await fetchGroup(group,controller);}};
     await Promise.all(Array.from({length:Math.min(3,searchGroups.length)},worker));
-    if(generation===searchGeneration){for(const group of searchGroups)if(controller.signal.aborted){group.loading=false;group.error='Consulta cancelada.';renderSearchGroup(group);}
-      const errors=searchGroups.filter(g=>g.error).length;
-      $('search-status').textContent=controller.signal.aborted?'Búsqueda cancelada.':`${searchGroups.reduce((n,g)=>n+g.items.length,0)} resultados · ${errors} ${errors===1?'fuente':'fuentes'} con error.`;}
+    if(generation===searchGeneration){for(const group of searchGroups)if(controller.signal.aborted){group.loading=false;group.error='Consulta cancelada.';renderSearchGroup(group);}renderSearchSummary(controller);}
     endQuery(controller);
   }
   function scheduleSearch() {
@@ -171,9 +185,9 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     searchTimer=setTimeout(search,350);
   }
   $('search-query').addEventListener('input',scheduleSearch);
-  $('search-source').addEventListener('change',scheduleSearch);
-  $('search-genre').addEventListener('change',()=>{$('search-genre-note').hidden=$('search-genre').value!=='adult';searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();$('search-status').textContent=$('search-genre').value==='adult'?'Género +18 seleccionado. Escribe un título o pulsa Buscar para descubrir.':'Catálogo general seleccionado.';});
-  $('source-hub').addEventListener('change',()=>{$('search-source').value='selected';scheduleSearch();});
+  $('search-source').addEventListener('change',()=>{renderAdultNote();scheduleSearch();});
+  $('search-genre').addEventListener('change',()=>{renderAdultNote();searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();$('search-status').textContent=$('search-genre').value==='adult'?'Género +18 seleccionado. Escribe un título o pulsa Buscar para descubrir.':'Catálogo general seleccionado.';});
+  $('source-hub').addEventListener('change',()=>{$('search-source').value='selected';renderAdultNote();scheduleSearch();});
   async function update() {
     const generation=++updateGeneration;
     const lockedPrivate=state().view==='private'&&!state().privateUnlocked;
