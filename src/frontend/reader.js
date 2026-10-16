@@ -539,7 +539,10 @@ function renderPages(images, saved) {
   layoutPages();
 }
 
-async function openChapter(id,{trial=null}={}) {
+async function openChapter(id,{trial=null,fromHistory=false}={}) {
+  queryRouteDebounced.cancel();
+  const enteredFromLibrary=!$('library').hidden&&!fromHistory;
+  if(enteredFromLibrary&&!trial)history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters())));
   const origin=trial?.item??series.find(item=>item.id===chapters.find(chapter=>String(chapter.id)===String(id))?.serie_id)??series.find(item=>String(item.ultimo_capitulo_id)===String(id));
   let target=trial?trial.list.find(chapter=>chapter.id===id):chapters.find(chapter=>String(chapter.id)===String(id)),prefetchedList;
   const previousSave=flushProgress()??writer.running;
@@ -594,7 +597,12 @@ async function openChapter(id,{trial=null}={}) {
     $('close-chapter').hidden = false;
     $('reload-chapter').hidden = false;
     updateNavigation();
-    history.replaceState(null, '', trial?location.pathname+'#'+trial.returnView:series.find(item=>item.id===current.serie_id)?.is_private ? location.pathname+'#private' : `${location.pathname}?chapter=${current.id}`);
+    if(trial||current.privateReading)history.replaceState(null,'',trial?navigationUrl(libraryRouteHash(trial.returnView,currentLibraryFilters())):navigationUrl('#private'));
+    else {
+      const params=new URLSearchParams(location.search);params.set('chapter',String(current.id));
+      history[enteredFromLibrary?'pushState':'replaceState']({reader:true,chapter:current.id},'',location.pathname+'?'+params);
+    }
+    lastRestoredUrl=location.href;
     await new Promise(resolve => requestAnimationFrame(resolve));
     if (signal.aborted) return;
     const serverSaved = savedProgress?.capitulo_id === current.id ? savedProgress : null;
@@ -918,7 +926,7 @@ async function closeChapter() {
   $('chapter-title').textContent = 'Una historia, sin interrupciones.';
   $('chapter-meta').textContent = 'Capítulo cerrado. Las imágenes se cargarán de nuevo cuando lo abras.';
   $('page-position').textContent = 'Listo para leer'; $('reading-progress').value = 0; $('progress-label').textContent = '0%';
-  history.replaceState(null, '', location.pathname); document.title = 'Lector Manga'; window.scrollTo(0, 0);
+  history.replaceState({view:returnView??activeView}, '', navigationUrl(libraryRouteHash(returnView??activeView,currentLibraryFilters()))); document.title = 'Lector Manga'; window.scrollTo(0, 0);
   await navigateView(returnView??activeView);loadLibrary();
 }
 
@@ -1038,7 +1046,10 @@ shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:act
 privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog,folders:shell?.folders()??[]}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
 function restoreRoute(){
   if(!routesReady||location.href===lastRestoredUrl)return;lastRestoredUrl=location.href;
-  if(!location.hash&&current){setLibrary(false);return;}
+  const chapter=new URLSearchParams(location.search).get('chapter');
+  if(!location.hash&&chapter&&/^[1-9]\d*$/.test(chapter)){
+    if(String(current?.id)===chapter)setLibrary(false);else openChapter(chapter,{fromHistory:true});return;
+  }
   const route=parseLibraryRoute(location.hash);
   if(route.view==='library')restoreLibraryFilters(route.filters);
   navigateView(route.view,false);
@@ -1064,9 +1075,10 @@ const initial = new URLSearchParams(location.search).get('chapter');
 const initialRoute=parseLibraryRoute(location.hash),hasInitialHash=Boolean(location.hash);
 if(initialRoute.view==='library')restoreLibraryFilters(initialRoute.filters);
 routesReady=true;
-if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial); if (hasInitialHash) { await navigateView(initialRoute.view,false); history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters()))); } }
+if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial,{fromHistory:true}); if (hasInitialHash) { await navigateView(initialRoute.view,false); history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters()))); } }
 else await navigateView(initialRoute.view,false);
 lastRestoredUrl=location.href;
+window.lectorStartup?.ready();
 $('add-toggle').disabled=!canLoad;
 if(cloudMode&&canLoad&&accountUser())accountUI.synchronize();
 if(cloudMode&&'serviceWorker' in navigator)navigator.serviceWorker.register(new URL('./sw.js',import.meta.url),{scope:new URL('./',import.meta.url).pathname}).catch(()=>{});
