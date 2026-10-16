@@ -19,6 +19,7 @@ test('saltar al contenido enfoca la vista actual sin navegar ni cambiar el hash'
     await expect(page.locator('#'+panel)).toBeFocused();expect(new URL(page.url()).hash).toBe(hash);
   }
   await page.locator('#show-home').click();await page.locator('#hero-action').click();await expect(page.locator('#reader')).toBeVisible();
+  await expect(page).toHaveURL(/\?chapter=2$/);
   const url=page.url();await page.locator('.skip-link').focus();await page.locator('.skip-link').press('Enter');
   await expect(page.locator('#reader')).toBeFocused();expect(page.url()).toBe(url);
 });
