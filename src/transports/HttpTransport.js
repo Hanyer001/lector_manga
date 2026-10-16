@@ -4,7 +4,7 @@ import { operationContext, cancellationError } from '../core/operation.js';
 const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 export class HttpTransport {
   constructor(scraper) { Object.assign(this, scraper); this.pageUrl = scraper.pageUrl.bind(scraper); this.resolveUrl = scraper.resolveUrl.bind(scraper); }
-  async fetchContent(input, { json = false, signal: externalSignal, form } = {}) {
+  async fetchContent(input, { json = false, signal: externalSignal, form, jsonBody } = {}) {
     const checkUrl = value => {
       if (!json) return this.pageUrl(value);
       const url = this.resolveUrl(value, this.apiBaseUrl);
@@ -21,13 +21,13 @@ export class HttpTransport {
       try {
         let url = initialUrl;
         // Algunos catálogos consultan mediante formularios POST públicos, sin sesión.
-        let body = form === undefined ? undefined : new URLSearchParams(form).toString();
+        let body = jsonBody !== undefined ? JSON.stringify(jsonBody) : form === undefined ? undefined : new URLSearchParams(form).toString();
         let response;
         for (let redirects = 0; ; redirects++) {
           response = await this.fetchImpl(url, {
             signal, redirect: 'manual', method: body === undefined ? 'GET' : 'POST', body,
             headers: { Accept: json ? 'application/json' : 'text/html,application/xhtml+xml',
-              ...(body === undefined ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' }),
+              ...(body === undefined ? {} : { 'Content-Type': jsonBody !== undefined ? 'application/json' : 'application/x-www-form-urlencoded' }),
               'User-Agent': 'PersonalMangaReader/0.1', Referer: this.baseUrl }
           });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
