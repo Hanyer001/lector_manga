@@ -219,9 +219,11 @@ test('Descubrir: vista previa sin añadir y más de 24 recomendaciones',async({p
 test('portadas: cambiar entre Inicio y Biblioteca reutiliza la descarga',async({page})=>{
   const requests=[];page.on('request',request=>{if(request.url().includes('/api/image?'))requests.push(request.url());});
   await page.goto(demo.web);await page.getByRole('button',{name:'Biblioteca',exact:true}).click();
+  await page.locator('#series-grid img').first().scrollIntoViewIfNeeded();
   await expect(page.locator('#series-grid img').first()).toHaveAttribute('src',/^blob:/);
   const initial=requests.length;
   await page.getByRole('button',{name:'Inicio',exact:true}).click();await page.getByRole('button',{name:'Biblioteca',exact:true}).click();
+  await page.locator('#series-grid img').first().scrollIntoViewIfNeeded();
   await expect(page.locator('#series-grid img').first()).toHaveAttribute('src',/^blob:/);expect(requests.length).toBe(initial);
 });
 

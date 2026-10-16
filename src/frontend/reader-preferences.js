@@ -1,12 +1,12 @@
 export const readerDefaults = Object.freeze({ mode:'vertical', direction:'rtl', fit:'width', zoom:100, width:760,
-  brightness:100, warmth:0, prefetch:4 });
+  brightness:100, warmth:0, prefetch:3 });
 const clamp = (value,min,max,fallback) => typeof value === 'number' && Number.isFinite(value) ? Math.min(max,Math.max(min,value)) : fallback;
 export function normalizeReaderPreferences(input = {}) {
   if (!input || typeof input !== 'object') input = {};
   const select = (key,choices) => choices.includes(input[key]) ? input[key] : readerDefaults[key];
   return { mode:select('mode',['vertical','paged']),direction:select('direction',['rtl','ltr']),fit:select('fit',['width','height','original']),
     zoom:clamp(input.zoom,50,200,100),width:clamp(input.width,320,1200,760),brightness:clamp(input.brightness,35,100,100),
-    warmth:clamp(input.warmth,0,70,0),prefetch:Math.round(clamp(input.prefetch,3,5,4)) };
+    warmth:clamp(input.warmth,0,70,0),prefetch:Math.round(clamp(input.prefetch,3,5,3)) };
 }
 // Las imágenes conservan siempre el orden del proveedor; RTL cambia controles, no URLs.
 export function pageStep(key,direction) {
@@ -14,7 +14,7 @@ export function pageStep(key,direction) {
   if (key === 'ArrowRight') return direction === 'rtl' ? -1 : 1;
   return 0;
 }
-export function readingWindow(total,first,last,prefetch = 4) {
+export function readingWindow(total,first,last,prefetch = 3) {
   if (!Number.isInteger(total) || total <= 0) return { load:[],retain:[] };
   first=Math.min(total-1,Math.max(0,Math.trunc(first)||0));
   last=Math.min(total-1,Math.max(first,Math.trunc(last)||first));

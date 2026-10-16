@@ -253,3 +253,26 @@ Mientras la página está oculta, una máscara cubre la interfaz. Al volver se c
 el reloj con los plazos originales, incluso si Safari suspendió los temporizadores.
 Recargar, pagehide, cerrar sesión y bloquear manualmente eliminan la clave y el DOM
 privado. El PIN local conserva su política anterior.
+# Conexión, precarga y enlaces de biblioteca
+
+`catalog-status.js` consulta `/api/health` al cargar el documento, sin sesión,
+credenciales ni datos de lectura, y obtiene la lista pública de fuentes. El
+primer intento tiene un límite de 70 segundos. No hay sondeos periódicos para
+mantener despierto el alojamiento; solo un reintento explícito o al recuperar
+la conexión. El indicador de servidor no implica que cada fuente haya respondido:
+los semáforos de búsqueda y recomendaciones reflejan sus consultas reales.
+
+El lector usa `IntersectionObserver` con margen vertical de 2000 px y una cola
+priorizada por páginas visibles; anticipa tres páginas de forma predeterminada.
+La preferencia existente permite ampliar a cuatro o cinco. Conserva dos páginas
+anteriores en RAM, revoca los blobs al salir de la ventana y no escribe imágenes
+en disco. Cada fallo temporal reintenta a 1 y 2 segundos; después queda el botón
+de esa página. Cerrar el lector cancela descargas y esperas pendientes.
+
+Los chips de lectura permanecen sobre la cuadrícula. `library-route.js` codifica
+estado, fuente, búsqueda, género, autor, publicación, carpeta, pendientes y orden
+en `#library?...`. Cambiar un filtro crea una entrada en el historial; escribir
+una búsqueda se agrupa durante 350 ms. Recargar, cambiar de sección y usar Atrás
+o Adelante restaura los controles y los resultados. Los parámetros externos se
+conservan excepto `chapter` al volver a la biblioteca. Los filtros de la bóveda
+privada nunca se escriben en la URL.

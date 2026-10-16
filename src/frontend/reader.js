@@ -6,6 +6,7 @@ import { renderSeriesCards, setGridLoading } from './library-view.js';
 import { enhanceSelects, syncSelectControls } from './ui-controls.js';
 import { initializeDialog, createDetailTabs } from './dialog-ui.js';
 import { changeView } from './view-transitions.js';
+import {parseLibraryRoute,libraryRouteHash,libraryRouteFields} from './library-route.js';
 import {homeModel} from './home-model.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
@@ -73,6 +74,23 @@ let pageFraction = 0;
 let reconciling = false;
 let activeView = 'library';
 const viewScroll = new Map();
+let routesReady=false,restoringFilters=false,lastRestoredUrl='';
+const queryRouteDebounced=debounce(()=>writeLibraryRoute(),350);
+function currentLibraryFilters(){return Object.fromEntries(Object.entries(libraryRouteFields).map(([key,id])=>[key,$(id).type==='checkbox'?($(id).checked?'1':''):$(id).value]));}
+function navigationUrl(hash){const params=new URLSearchParams(location.search);params.delete('chapter');return location.pathname+(params.size?'?'+params:'')+hash;}
+function writeLibraryRoute(mode='push'){
+  if(!routesReady||restoringFilters||activeView!=='library'||$('library').hidden)return;
+  const hash=libraryRouteHash('library',currentLibraryFilters());
+  if(location.hash!==hash){history[mode==='replace'?'replaceState':'pushState']({view:'library'},'',navigationUrl(hash));lastRestoredUrl=location.href;}
+}
+function restoreLibraryFilters(filters){
+  restoringFilters=true;queryRouteDebounced.cancel();
+  for(const [key,id] of Object.entries(libraryRouteFields)){
+    const control=$(id),value=filters[key]??(key==='sort'?'recent':'');
+    if(control.type==='checkbox')control.checked=value==='1';else control.value=value;
+  }
+  syncSelectControls('reading-filter');restoringFilters=false;
+}
 const queries = new Set();
 function beginQuery() { const controller = new AbortController(); queries.add(controller); $('cancel-operation').hidden = false; return controller; }
 function endQuery(controller) { queries.delete(controller); $('cancel-operation').hidden = !queries.size; }
@@ -99,8 +117,11 @@ async function api(path, options = {}) {
   try {
     for(let attempt=0;attempt<2;attempt++) {
       const response = await apiFetch(path, { ...options, headers, signal:controller.signal });
-      if(response.ok&&response.headers.get('content-type')?.includes('application/x-ndjson'))return await readRecommendationStream(response,options.onProgress);
+      if(response.ok&&response.headers.get('content-type')?.includes('application/x-ndjson')){
+        const result=await readRecommendationStream(response,progress=>{window.lectorCatalogs?.record(path,progress);options.onProgress?.(progress);});return result;
+      }
       const data=await response.json();
+      window.lectorCatalogs?.record(path,data,response.ok);
       if(!response.ok) {
         if(cloudMode&&data.error?.code==='ACCOUNT_CHANGED'&&attempt===0)continue;
         const error=new Error(data.error?.message??`Error HTTP ${response.status}`);error.code=data.error?.code;
@@ -111,7 +132,7 @@ async function api(path, options = {}) {
       options.onRevision?.(Number(response.headers.get('X-Library-Revision') ?? 0));
       return data;
     }
-  } catch(error) { if(timedOut)throw new Error('La consulta tardó demasiado. Puedes reintentar.');throw error; }
+  } catch(error) { if(!controller.signal.aborted||timedOut)window.lectorCatalogs?.record(path,null,false);if(timedOut)throw new Error('La consulta tardó demasiado. Puedes reintentar.');throw error; }
   finally { clearTimeout(timer);options.signal?.removeEventListener('abort',abort); }
 }
 
@@ -308,8 +329,9 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 
 function unload(slot) {
+  clearTimeout(slot.retryTimer);slot.retryTimer=null;
   if(slot.blobUrl){URL.revokeObjectURL(slot.blobUrl);slot.blobUrl=null;}
-  if (slot.state !== 'loaded') return;
+  if (!['loaded','retrying'].includes(slot.state)) return;
   slot.img.removeAttribute('src');
   slot.state = 'idle';
   slot.element.dataset.state = 'idle';
@@ -326,7 +348,7 @@ function setRatio(slot, ratio) {
 
 function pump() {
   if (reconciling || restoring || !$('library').hidden || document.visibilityState === 'hidden') return;
-  // Orden de la ventana: visibles primero, después las siguientes 3–5.
+  // Visibles primero; por defecto solo las siguientes tres, con concurrencia acotada.
   const candidates = [...queue].filter(slot => slot.near && slot.state === 'idle');
   for (const slot of candidates) {
     if (running >= MAX_IN_FLIGHT) break;
@@ -343,6 +365,7 @@ function loadImage(slot) {
   slot.message.textContent = 'Cargando imagen…';
   slot.retry.hidden = true;
   let settled = false;
+  let retryable=true;
   const controller = new AbortController();
   const finish = (outcome) => {
     if (settled) return;
@@ -354,6 +377,7 @@ function loadImage(slot) {
     if (version !== generation) return;
     running--;
     if (outcome === 'loaded' && slot.img.naturalWidth && slot.img.naturalHeight) {
+      slot.failures=0;
       slot.naturalWidth = slot.img.naturalWidth;
       setRatio(slot, slot.img.naturalWidth / slot.img.naturalHeight);
       slot.state = 'loaded';
@@ -369,10 +393,17 @@ function loadImage(slot) {
       slot.message.textContent = 'La imagen se cargará al acercarte.';
     } else {
       slot.img.removeAttribute('src');
-      slot.state = 'error';
-      slot.element.dataset.state = 'error';
-      slot.message.textContent = 'No se pudo cargar esta imagen. Reintenta o recarga las imágenes del capítulo.';
+      if(slot.blobUrl){URL.revokeObjectURL(slot.blobUrl);slot.blobUrl=null;}
+      const retry=retryable&&slot.failures<2&&slot.near&&document.visibilityState!=='hidden';
+      slot.state=retry?'retrying':'error';slot.element.dataset.state=slot.state;
+      const delay=1000*2**slot.failures;slot.failures++;
+      slot.message.textContent=retry?`Conexión interrumpida. Reintentando en ${delay/1000} s…`:'No se pudo cargar esta página. Puedes reintentar sin cerrar el capítulo.';
       slot.retry.hidden = false;
+      if(retry)slot.retryTimer=setTimeout(()=>{
+        slot.retryTimer=null;
+        if(version!==generation||!slot.near||!$('library').hidden||document.visibilityState==='hidden')return;
+        slot.state='idle';queue.add(slot);pump();
+      },delay);
     }
     updatePosition();
     pump();
@@ -383,7 +414,7 @@ function loadImage(slot) {
   slot.img.onerror = () => finish('error');
   // La única descarga es la imagen firmada del proxy Node, en esta cola acotada.
   if(cloudMode)apiFetch(slot.url,{signal:controller.signal}).then(async response=>{
-    if(!response.ok)throw new Error('No se pudo cargar la imagen.');
+    if(!response.ok){retryable=response.status>=500||[408,429].includes(response.status);throw new Error('No se pudo cargar la imagen.');}
     const blob=await response.blob();if(settled||version!==generation)return;
     slot.blobUrl=URL.createObjectURL(blob);slot.img.src=slot.blobUrl;
   }).catch(()=>finish(controller.signal.aborted?'cancel':'error'));
@@ -393,8 +424,8 @@ function loadImage(slot) {
 function observePages() {
   loadObserver?.disconnect();
   if (readerUI.preferences.mode === 'vertical') {
-    loadObserver = new IntersectionObserver(reconcileImages, { threshold:0 });
-    for(const slot of slots) loadObserver.observe(slot.element);
+    if('IntersectionObserver' in window)loadObserver = new IntersectionObserver(reconcileImages, { rootMargin:'2000px 0px',threshold:0 });
+    for(const slot of slots) loadObserver?.observe(slot.element);
   }
   reconcileImages();
 }
@@ -490,8 +521,9 @@ function renderPages(images, saved) {
     number.className = 'page-number'; number.textContent = `IMAGEN ${String(index + 1).padStart(2, '0')}`;
     const message = document.createElement('p'); message.textContent = 'La imagen se cargará al acercarte.';
     const retry = document.createElement('button');
-    retry.type = 'button'; retry.className = 'button subtle'; retry.textContent = 'Reintentar'; retry.hidden = true;
+    retry.type = 'button'; retry.className = 'button subtle'; retry.textContent = `Reintentar página ${index+1}`; retry.hidden = true;
     const slot = { element, img, message, retry, index, state: 'idle', near: false,
+      failures:0,retryTimer:null,
       naturalWidth:Number(saved?.naturalWidths?.[index])||0,
       ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : .45, url: imageProxyUrl(image, apiOrigin) };
     element.style.setProperty('--page-ratio', String(slot.ratio));
@@ -499,7 +531,7 @@ function renderPages(images, saved) {
       if(readerUI.preferences.mode!=='paged'||index!==pageIndex||restoring||!$('library').hidden)return;
       pageFraction=Math.min(1,element.scrollTop/Math.max(1,element.scrollHeight));dirty=true;updatePosition();saveDebounced();
     },{passive:true});
-    retry.addEventListener('click', () => { slot.state = 'idle'; slot.near = true; queue.add(slot); pump(); });
+    retry.addEventListener('click', () => { clearTimeout(slot.retryTimer);slot.retryTimer=null;slot.failures=0;slot.state = 'idle';reconcileImages(); });
     placeholder.append(number, message, retry); element.append(img, placeholder); fragment.append(element);
     return slot;
   });
@@ -808,7 +840,15 @@ function showSearch(show) {
   return navigateView(show ? 'explore' : 'library');
 }
 function navigateView(view, push = true) {
+  queryRouteDebounced.cancel();
+  if(push)writeLibraryRoute('replace');
   const destination=['home','library','discover','explore','settings','private'].includes(view)?view:'home';
+  // El historial cambia al pulsar: Atrás no debe esperar a la animación.
+  if(push){
+    const hash=libraryRouteHash(destination,currentLibraryFilters());
+    if(location.hash!==hash)history.pushState({view:destination},'',navigationUrl(hash));
+    lastRestoredUrl=location.href;
+  }
   return changeView(()=>applyView(destination,push),{animate:push&&(activeView!==destination||$('library').hidden),privateView:activeView==='private'||destination==='private'||Boolean(current?.privateReading)});
 }
 function applyView(view,push) {
@@ -827,7 +867,7 @@ function applyView(view,push) {
   $('show-more').setAttribute('aria-pressed', String(['settings','private'].includes(view)));
   renderEmptyState();
   (matchMedia('(max-width:767px)').matches && view==='explore' ? $('search-query') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
-  if (push && location.hash !== '#'+view) history.pushState({view},'',location.pathname+'#'+view);
+  lastRestoredUrl=location.href;
   document.title=view==='private'?'Lector · Biblioteca privada':view==='discover'?'Lector · Descubrir':'Lector · Tu biblioteca';
   privacy?.enter(view);
   if(view==='library')filterLibrary();
@@ -892,14 +932,15 @@ $('add-toggle').addEventListener('click',()=>openAddDialog());
 $('add-close').addEventListener('click', () => setDialog('add-panel', false));
 $('picker-close').addEventListener('click', () => setDialog('chapter-controls', false));
 $('refresh-library').addEventListener('click', loadLibrary);
-$('source-filter').addEventListener('change', () => filterLibrary(''));
+$('source-filter').addEventListener('change', () => {filterLibrary('');writeLibraryRoute();});
 $('add-series-form').addEventListener('submit', event => { event.preventDefault(); addFavorite($('series-url').value.trim()); });
 $('search-form').addEventListener('submit', event => { event.preventDefault(); shell.search(); });
 $('show-search').addEventListener('click', () => showSearch(true));
 $('show-discover').addEventListener('click',()=>navigateView('discover'));
 $('show-saved').addEventListener('click', () => showSearch(false));
 $('show-private').addEventListener('click',()=>navigateView('private'));
-for (const id of ['library-query', 'library-sort', 'only-unread']) $(id).addEventListener(id === 'library-query' ? 'input' : 'change', () => filterLibrary());
+for (const id of ['library-query', 'library-sort', 'only-unread']) $(id).addEventListener(id === 'library-query' ? 'input' : 'change', () => {filterLibrary();if(id==='library-query')queryRouteDebounced();else writeLibraryRoute();});
+$('genre-filter').addEventListener('change',()=>writeLibraryRoute());
 $('cancel-operation').addEventListener('click', () => { for (const controller of queries) controller.abort(); });
 $('close-chapter').addEventListener('click', closeChapter);
 $('reload-chapter').addEventListener('click', () => { if (current) openChapter(current.id,{trial:current.trial}); });
@@ -982,7 +1023,7 @@ function clearSensitive({onlySeries}={}) {
   for(const id of ['edition-select','edition-from','edition-existing'])$(id).replaceChildren();
   $('series-select').replaceChildren();fillChapters([]);filterLibrary();renderHero();shell?.renderHome();shell?.clearDiscovery();shell?.clearSearch();
   shell?.clearPrivate();
-  history.replaceState({view:activeView},'',location.pathname+'#'+activeView);document.title='Lector · Tu biblioteca';
+  history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters())));document.title='Lector · Tu biblioteca';
   return saved;
 }
 let alternatives;
@@ -992,10 +1033,18 @@ $('reader-trial-ficha').addEventListener('click',async()=>{if(!current?.trial)re
 $('reader-failed-alternatives').addEventListener('click',()=>$('reader-alternatives').click());
 $('reader-alternatives').addEventListener('click',()=>{const info=failedReading??(current?{item:current.trial?.item??series.find(item=>item.id===current.serie_id),number:current.number??current.numero??null}:null);if(info?.item&&!info.item.is_private)alternatives(info.item,{number:info.number});});
 shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:activeView,privateUnlocked:privacy?.unlocked()??false}),navigate:navigateView,select:selectSeries,
-  resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,filter:()=>filterLibrary(),reload:loadLibrary,
+  resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,filter:()=>{filterLibrary();writeLibraryRoute();},reload:loadLibrary,
   dialog:setDialog,beginQuery,endQuery});
 privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog,folders:shell?.folders()??[]}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
-window.addEventListener('popstate',()=>{const view=location.hash.slice(1);if(['home','library','discover','explore','settings','private'].includes(view))navigateView(view,false);else if(current)setLibrary(false);else navigateView('home',false);});
+function restoreRoute(){
+  if(!routesReady||location.href===lastRestoredUrl)return;lastRestoredUrl=location.href;
+  if(!location.hash&&current){setLibrary(false);return;}
+  const route=parseLibraryRoute(location.hash);
+  if(route.view==='library')restoreLibraryFilters(route.filters);
+  navigateView(route.view,false);
+}
+window.addEventListener('popstate',restoreRoute);
+window.addEventListener('hashchange',restoreRoute);
 document.querySelector('.skip-link').addEventListener('click',event=>{
   event.preventDefault();
   const target=$('reader').hidden ? document.querySelector('#library > section:not([hidden])') ?? $('main-content') : $('reader');
@@ -1012,9 +1061,12 @@ if(cloudMode) {
 if(canLoad)await loadLibrary();
 if(cloudMode&&canLoad)await replayPending();
 const initial = new URLSearchParams(location.search).get('chapter');
-const initialView = location.hash.slice(1);
-if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial); if (initialView) { await navigateView(initialView,false); history.replaceState({view:activeView},'',location.pathname+location.search+'#'+activeView); } }
-else await navigateView(initialView || 'home',false);
+const initialRoute=parseLibraryRoute(location.hash),hasInitialHash=Boolean(location.hash);
+if(initialRoute.view==='library')restoreLibraryFilters(initialRoute.filters);
+routesReady=true;
+if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial); if (hasInitialHash) { await navigateView(initialRoute.view,false); history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters()))); } }
+else await navigateView(initialRoute.view,false);
+lastRestoredUrl=location.href;
 $('add-toggle').disabled=!canLoad;
 if(cloudMode&&canLoad&&accountUser())accountUI.synchronize();
 if(cloudMode&&'serviceWorker' in navigator)navigator.serviceWorker.register(new URL('./sw.js',import.meta.url),{scope:new URL('./',import.meta.url).pathname}).catch(()=>{});
