@@ -1,6 +1,7 @@
 
 * { box-sizing: border-box; }
-[hidden] { display: none !important; }
+[hidden], dialog:not([open]) { display: none !important; }
+#startup-status { padding: 4rem 1.5rem; color: var(--muted); text-align: center; }
 html { background: var(--bg); scrollbar-gutter: stable; overflow-anchor: none; }
 body { margin: 0; color: var(--text); background: var(--bg); padding-bottom: 64px; }
 body.library-open { padding-bottom: 0; }

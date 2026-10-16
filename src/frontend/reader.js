@@ -1,3 +1,4 @@
+import {orderedChapters} from './chapter-order.js';
 import {createChapterBrowser} from './chapter-browser.js';
 import {libraryProgress,publicationLabels} from './library-progress.js';
 import {tagLabel} from './discovery-core.js';
@@ -128,8 +129,10 @@ function applyLibrary(open, { opening = false } = {}) {
     flushProgress(); readerScrollY = window.scrollY; readerPoint = anchor();
   } else if (!open && wasOpen) libraryScrollY = window.scrollY;
   $('library').hidden = !open;
+  $('reader').hidden = open;
+  $('startup-status').hidden = true;
   $('reader').classList.toggle('view-enter',!open);
-  document.querySelector('.skip-link').setAttribute('href', open ? '#library' : '#reader');
+
   document.body.classList.toggle('library-open', open);
   const navigation=document.querySelector('nav[aria-label="Navegación principal"]');
   navigation.inert=!open;
@@ -547,7 +550,7 @@ async function openChapter(id,{trial=null}={}) {
     $('reader-alternatives').hidden=Boolean(current.privateReading);
     if(trial)$('save-status').textContent='Lectura de prueba · no se guarda la obra ni su progreso';
     document.body.classList.add('reader-active');
-    chapters = list;
+    chapters = orderedChapters(list);
     const local = trial?null:cache[current.id];
     renderPages(result.images, local);
     $('series-title').textContent = trial?(trial.item.title??trial.item.titulo):series.find(item => item.id === current.serie_id)?.titulo ?? 'TU LECTURA';
@@ -615,6 +618,7 @@ function updateNavigation() {
 }
 
 function fillChapters(list) {
+  list=orderedChapters(list);
   const saved = series.find(item => String(item.id) === $('series-select').value);
   const resume = list.find(chapter => chapter.id === saved?.ultimo_capitulo_id);
   pickedChapterId = (resume ?? list.find(chapter => !chapter.estado_lectura) ?? list[0])?.id ?? null;
@@ -991,6 +995,11 @@ shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:act
   dialog:setDialog,beginQuery,endQuery});
 privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog,folders:shell?.folders()??[]}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
 window.addEventListener('popstate',()=>{const view=location.hash.slice(1);if(['home','library','discover','explore','settings','private'].includes(view))navigateView(view,false);else if(current)setLibrary(false);else navigateView('home',false);});
+document.querySelector('.skip-link').addEventListener('click',event=>{
+  event.preventDefault();
+  const target=$('reader').hidden ? document.querySelector('#library > section:not([hidden])') ?? $('main-content') : $('reader');
+  target.tabIndex=-1;target.focus({preventScroll:true});target.scrollIntoView({block:'start'});
+});
 const accountUI=createAccountUI({api,reload:loadLibrary,navigate:navigateView,lockPrivate:()=>privacy.lock(),beforeSignOut:async()=>{await flushProgress();if(writer.running)await writer.running;await privacy.lock();}});
 const canLoad=await accountUI.start();
 if(cloudMode) {

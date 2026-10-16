@@ -1,14 +1,14 @@
 let recoveryPromise;
 const $=id=>document.getElementById(id);
 export function configureVaultInputs(enabled) {
-  if(!enabled)return;
+  if(!enabled){$('private-security-note').textContent='En este modo local, el PIN bloquea el acceso desde la aplicación, pero la base de datos no está cifrada. La versión publicada utiliza una biblioteca privada cifrada.';return;}
   const labels={'private-pin':'Contraseña de cifrado','private-pin-confirm':'Repite tu contraseña','private-new-pin':'Nueva contraseña de cifrado','private-new-confirm':'Repite la nueva contraseña','account-private-pin':'Contraseña de cifrado','account-private-confirm':'Repite tu contraseña'};
   for(const [id,label] of Object.entries(labels)) {
     const input=$(id);input.removeAttribute('pattern');input.removeAttribute('inputmode');input.minLength=12;input.maxLength=512;input.placeholder='12 caracteres o más';
     const text=[...(input.labels?.[0]?.childNodes??[])].find(node=>node.nodeType===3);if(text)text.textContent=label;
   }
   $('private-change-form').closest('details').querySelector('summary').textContent='Cambiar mi contraseña de cifrado';
-  $('private-security-note').textContent='Desbloquea una vez por sesión. Configura en Ajustes el bloqueo por inactividad y al cambiar de aplicación. Recargar o cerrar la página vuelve a bloquearla. Los títulos, carpetas y progreso se cifran aquí; Render procesa las URL e imágenes mientras lees. Guarda la clave de recuperación.';
+  $('private-security-note').textContent='Desbloquea una vez por sesión. Configura en Ajustes el bloqueo por inactividad y al cambiar de aplicación. Recargar o cerrar la página vuelve a bloquearla. Los títulos, enlaces, portadas, carpetas y progreso se guardan cifrados con AES-GCM; la clave se protege con una contraseña derivada mediante PBKDF2 en este navegador. Render procesa las URL e imágenes mientras lees. Guarda la clave de recuperación.';
   $('private-recovery-label').hidden=false;
   $('account-private-note').textContent='La contraseña de cifrado se usa únicamente en tu navegador. Al terminar, volveremos a bloquear la biblioteca.';
 }
