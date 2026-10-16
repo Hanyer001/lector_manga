@@ -43,6 +43,7 @@ test('lector inmersivo: zonas superior, central e inferior y ancho máximo',asyn
     await page.locator('[data-reader-tap="next"]').click();await expect(page.locator('#page-position')).toContainText('Imagen 3 de 6');
     await page.locator('[data-reader-tap="previous"]').click();await expect(page.locator('#page-position')).toContainText('Imagen 2 de 6');
     await page.locator('[data-reader-tap="toggle"]').press('Enter');await expect(page.locator('#reader-overlay')).toBeVisible();
+    await expect(page.locator('.reader-tap-feedback')).toHaveText('Controles visibles');
     const style=await page.locator('#reader').evaluate(el=>({width:el.getBoundingClientRect().width,background:getComputedStyle(document.body).backgroundColor}));
     expect(style.width).toBeLessThanOrEqual(800);expect(style.background).toBe('rgb(0, 0, 0)');
     await page.locator('#reading-zoom').press('End');
