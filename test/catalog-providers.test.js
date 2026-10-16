@@ -16,6 +16,7 @@ test('ComicK: búsqueda de fichas, idiomas preservados y capítulos deshabilitad
 });
 function qwik(value){const objs=[];const put=value=>{const index=objs.length;objs.push(null);objs[index]=Array.isArray(value)?value.map(put):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,put(item)])):value;return index.toString(36);};put(value);return '<script type="qwik/json">'+JSON.stringify({objs})+'</script>';}
 test('Ikigai: páginas de capítulos completas, numéricas y sin enlaces de primer/último duplicados',async()=>{
+ const definition=definitionFor('ikigai');assert.equal(createSources([definition],{environment:'render'}).get('ikigai').enabled,false);assert.notEqual(createSources([definition],{environment:'local'}).get('ikigai').enabled,false);
  const origin=definitionFor('ikigai').baseUrl,root=origin+'series/historia/';let pages=[];
  const scraper=new Ikigai({fetchImpl:async url=>{const page=Number(new URL(url).searchParams.get('pagina'));pages.push(page);return html(`<main><div><div><h1>Historia</h1><p>En Curso</p></div></div><a href="/capitulo/999/">Primer capítulo</a><a href="/capitulo/${page===1?'10':'2'}/"><h3>Capítulo ${page===1?'10':'2'}</h3></a>${page===1?'<a href="?pagina=2">Siguiente</a>':''}</main>`);}});
  const result=await scraper.getChapters(root);assert.deepEqual(pages,[1,2]);assert.deepEqual(result.chapters.map(row=>row.number),[2,10]);assert.equal(result.chapters.length,2);

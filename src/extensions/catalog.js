@@ -15,6 +15,7 @@ export const sourceDefinitions = [
   },
   {
     id:'ikigai',name:'Ikigai Mangas',baseUrl:'https://visualikigai.cmpunjabrashancard.pk/',pageOrigins:['https://visualikigai.cmpunjabrashancard.pk','https://visualikigai.com'],
+    unavailableIn:{render:'Ikigai responde HTTP 403 a las consultas desde Render. El adaptador de lectura está disponible en el servidor local.'},
     imageOrigins:['https://image2.ikigaimangas.cloud','https://image3.ikigaimangas.cloud'],recommendationCatalogOnly:true,
     capabilities:{search:false,manga:true,chapters:true,images:true,recommend:true},
     note:'Dominio de lectura enlazado por ikigaimangas.com. Explora en Descubrir o añade la URL de una serie; solo cómics públicos.',load:()=>import('./ikigai.js')
