@@ -843,6 +843,12 @@ function navigateView(view, push = true) {
   queryRouteDebounced.cancel();
   if(push)writeLibraryRoute('replace');
   const destination=['home','library','discover','explore','settings','private'].includes(view)?view:'home';
+  // El historial cambia al pulsar: Atrás no debe esperar a la animación.
+  if(push){
+    const hash=libraryRouteHash(destination,currentLibraryFilters());
+    if(location.hash!==hash)history.pushState({view:destination},'',navigationUrl(hash));
+    lastRestoredUrl=location.href;
+  }
   return changeView(()=>applyView(destination,push),{animate:push&&(activeView!==destination||$('library').hidden),privateView:activeView==='private'||destination==='private'||Boolean(current?.privateReading)});
 }
 function applyView(view,push) {
@@ -861,8 +867,6 @@ function applyView(view,push) {
   $('show-more').setAttribute('aria-pressed', String(['settings','private'].includes(view)));
   renderEmptyState();
   (matchMedia('(max-width:767px)').matches && view==='explore' ? $('search-query') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
-  const hash=libraryRouteHash(view,currentLibraryFilters());
-  if (push && location.hash !== hash) history.pushState({view},'',navigationUrl(hash));
   lastRestoredUrl=location.href;
   document.title=view==='private'?'Lector · Biblioteca privada':view==='discover'?'Lector · Descubrir':'Lector · Tu biblioteca';
   privacy?.enter(view);
