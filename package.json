@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "clean-css": "^5.3.3"
   }
 }
