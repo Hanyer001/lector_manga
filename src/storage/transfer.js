@@ -65,7 +65,7 @@ export function createLibraryTransfer(db, openDatabase) {
           positiveId(row.id);positiveId(row.work_id); if (!text(row.titulo) || !text(row.source, 80) || !['planned', 'reading', 'on_hold', 'completed', 'abandoned'].includes(row.reading_state)) throw invalid('Ficha de serie inválida.');
           httpUrl(row.url_origen); if (row.portada) httpUrl(row.portada);
           const metadata = JSON.parse(row.metadata_json), safeMetadata=normalizeMetadata(metadata, true);
-          const metadataFields=['genres','themes','authors','altTitles','status','country','description','language','contentRating'];
+          const metadataFields=['genres','themes','authors','altTitles','status','country','description','language','contentRating','chapterAlignment'];
           if (metadata.manualFields && (!Array.isArray(metadata.manualFields) || metadata.manualFields.some(field => !metadataFields.includes(field)))) throw invalid('Metadatos inválidos.');
           row.metadata_json=JSON.stringify({...safeMetadata,manualFields:[...new Set(metadata.manualFields??[])]});
           validateSeries(row);
