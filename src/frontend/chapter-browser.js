@@ -5,7 +5,7 @@ export function chapterEntries(chapters, { query = '', order = 'asc', filter = '
   const words = normalize(query).split(/\s+/).filter(Boolean);
   return chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => {
     const read = Boolean(chapter.estado_lectura);
-    const searchable = normalize(`${chapter.titulo ?? chapter.title} ${chapter.numero ?? chapter.number ?? ''}`);
+    const searchable = normalize(`${chapter.titulo ?? chapter.title} ${chapter.numero ?? chapter.number ?? ''} ${chapter.aligned_number??''}`);
     return words.every(word => searchable.includes(word)) && (filter === 'all' || filter === 'read' && read || filter === 'unread' && !read || filter === 'last' && String(chapter.id) === String(lastId));
   }).sort((a, b) => {
     const difference = compareChapters(a.chapter,b.chapter);
@@ -46,7 +46,7 @@ export function createChapterBrowser(container, { onChoose, temporary = false } 
       if (last) button.setAttribute('aria-current', 'true');
       button.classList.toggle('selected', selected);
       if (temporary) button.setAttribute('aria-pressed', String(selected));
-      const name = document.createElement('span'); name.textContent = title;
+      const name = document.createElement('span'); name.textContent = title+(chapter.aligned_number!==undefined?` · Orden común ${chapter.aligned_number}`:'');
       const state = document.createElement('span'); state.className = 'chapter-state'; state.textContent = status;
       button.append(name, state); button.addEventListener('click', () => { selectedId = chapter.id; render(); list.querySelector('.chapter-row.selected')?.focus({preventScroll:true}); onChoose?.(chapter, index); });
       row.append(button); list.append(row);
