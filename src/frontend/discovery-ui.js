@@ -25,7 +25,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
   function drawCollection(){
     for(const button of document.querySelectorAll('[data-rec-collection]'))button.setAttribute('aria-pressed',String(button.dataset.recCollection===collection));
     $('rec-results-title').textContent=collectionLabels[collection];
-    $('rec-collection-copy').textContent=collection==='newest'?'Incorporaciones recientes de cada catálogo con capítulos disponibles en español. El orden se conserva dentro de cada fuente.':collection==='completed'?'Obras marcadas como finalizadas por su catálogo. La traducción al español puede seguir en curso.':'Explora por tus gustos, tus lecturas o los filtros que elijas.';
+    $('rec-collection-copy').textContent=collection==='newest'?'Novedades de cada catálogo. Las fuentes de fichas se identifican y requieren buscar una edición para leer.':collection==='completed'?'Obras marcadas como finalizadas por su catálogo. La traducción al español puede seguir en curso.':'Explora por tus gustos, tus lecturas o los filtros que elijas.';
     $('rec-mode-controls').hidden=collection!=='recommendations';
     $('rec-status').disabled=collection==='completed';
     $('rec-result-sort').options[0].textContent=collection==='newest'?'Novedades del catálogo':'Afinidad recomendada';
@@ -141,7 +141,7 @@ export function createDiscoveryUI({preview,api,state,reload,select,add,navigate,
     attempted=true;
     if(!more&&!refresh&&event?.type!=='submit'&&cached?.expires>Date.now()){phase='complete';applyResult(cached.result);return;}
     phase='loading';lastMessage='';const version=generation,controller=request=beginQuery();
-    $('load-recommendations').disabled=true;$('recommend-submit').disabled=true;$('recommend-results').setAttribute('aria-busy','true');$('recommend-reason').textContent=`Buscando en ${sourceSelection?.size??availableSources().length} catálogos en español…`;
+    $('load-recommendations').disabled=true;$('recommend-submit').disabled=true;$('recommend-results').setAttribute('aria-busy','true');$('recommend-reason').textContent=`Buscando en ${sourceSelection?.size??availableSources().length} catálogos…`;
     $('recommend-warnings').hidden=true;render();
     try {
       if(event?.type==='submit')await api('/api/discovery',{method:'PUT',body:JSON.stringify(preferences),signal:controller.signal});

@@ -36,7 +36,7 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
     const alreadySaved = Boolean(onAdd && hasFavorite(item)); choose.disabled = false;
     const cover = document.createElement('div'); cover.className = 'series-cover';
     const badge = document.createElement('span'); badge.className = 'cover-badge';
-    badge.textContent = onAdd ? sourceName(item.source) : item.total_capitulos ? item.pendientes ? `${item.pendientes} sin leer` : '' : 'Sin sincronizar';
+    badge.textContent = onAdd ? sourceName(item.source)+(item.metadataOnly?' · Solo ficha':'') : item.total_capitulos ? item.pendientes ? `${item.pendientes} sin leer` : '' : 'Sin sincronizar';
     badge.hidden = !badge.textContent;
     const country = document.createElement('span'); country.className = 'origin-badge';
     const known = typeof item.country === 'string' && /^[A-Z]{2}$/.test(item.country);
@@ -86,10 +86,13 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
       button.textContent = text; button.addEventListener('click', handler); actions.append(button); return button;
     };
     if (onAdd) {
+      if(item.metadataOnly)action('Ver ficha y buscar dónde leer',()=>onSelect?.(item),true);
+      else {
       const button = action(alreadySaved ? 'En tu biblioteca ✓' : '＋ Añadir a biblioteca', async () => {
         button.disabled = true; try { await onAdd(item); } finally { button.disabled = false; }
       }, true);
       button.disabled = alreadySaved;
+      }
       if(onFeedback) {
         const menu=document.createElement('details');menu.className='recommendation-menu';const summary=document.createElement('summary');summary.textContent='Afinar sugerencia';menu.append(summary);
         for(const [kind,label] of [['like','Me gustó'],['dislike','No me gustó'],['more_like','Más como este'],['hidden','No me interesa'],['already_read','Ya lo leí']]) {
@@ -97,7 +100,7 @@ export function renderSeriesCards(container, items, { selectedId, sourceName, on
         }
         actions.append(menu);
       }
-    } else {
+    } else if(!onAdd) {
       if (item.ultimo_capitulo_id) {
         const button = action('Continuar ↗', () => onResume(item), true);
         button.setAttribute('aria-label', `Continuar ${title}`);

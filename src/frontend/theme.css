@@ -11,7 +11,10 @@
  --cover-gradient:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.65) 45%,transparent 100%);
  --cover-text-shadow:0 1px 8px rgba(0,0,0,.8); --floating-shadow:0 6px 24px rgba(0,0,0,.4);
  --radius-control:8px; --radius-card:8px; --radius-panel:16px; --reader-width:760px;
- font:16px/1.5 Inter,Roboto,system-ui,-apple-system,'Segoe UI',sans-serif;
+ --font-body:Inter,Roboto,system-ui,-apple-system,'Segoe UI',sans-serif;
+ --font-heading:'Plus Jakarta Sans',Inter,system-ui,sans-serif;
+ --font-label:'JetBrains Mono',ui-monospace,monospace;
+ font:16px/1.5 var(--font-body);
 }
 :root[data-theme='oled'] { --bg:#000000; --panel:#0a0a0a; --raised:#121212; --text:#e0e0e0; --surface-glass:rgba(0,0,0,.85); }
 :root[data-theme='dark'] { --bg:#0b0d12; --panel:#151821; --raised:#202431; --muted:#a6adbb; --border-subtle:#343b4c; --surface-glass:rgba(11,13,18,.85); }

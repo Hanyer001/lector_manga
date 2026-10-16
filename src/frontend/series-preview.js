@@ -13,7 +13,7 @@ export function createSeriesPreview({api,add,select,findSaved,read,alternatives,
   let current,controller,list=[],requestedNumber=null,loading=false,options={};
   const browser = createChapterBrowser($('browser'), {temporary:true,onChoose:(_chapter,index)=>{ $('chapter-select').value=String(index); updateRead(); }});
   $('save').addEventListener('click',()=>$('add').click());
-  $('start').addEventListener('click',async()=>{ if (!current) return; const saved=findSaved(current); if(saved){dialog.close();if(saved.ultimo_capitulo_id)read?.(saved,null,null,{saved:true});else await select(saved);return;} const loaded=await loadChapters(); if(!loaded||!current||!list.length||requestedNumber!==null)return; const item=current,chapter=list[0],chapters=list; dialog.close(); read?.(item,chapter,chapters); });
+  $('start').addEventListener('click',async()=>{ if (!current) return;if(current.metadataOnly){$('alternatives').click();return;} const saved=findSaved(current); if(saved){dialog.close();if(saved.ultimo_capitulo_id)read?.(saved,null,null,{saved:true});else await select(saved);return;} const loaded=await loadChapters(); if(!loaded||!current||!list.length||requestedNumber!==null)return; const item=current,chapter=list[0],chapters=list; dialog.close(); read?.(item,chapter,chapters); });
   const showMetadata=details=>{
     $('tags').textContent=[...(details.genres??[]),...(details.themes??[])].map(tagLabel).join(' · ')||'Sin etiquetas disponibles';
     $('description').textContent=details.description||'Esta fuente no incluye una sinopsis.';
@@ -54,6 +54,8 @@ export function createSeriesPreview({api,add,select,findSaved,read,alternatives,
     $('start').textContent=saved?.ultimo_capitulo_id?'Continuar lectura':'Leer primer capítulo';
     $('start').disabled=false;$('start').hidden=requestedNumber!==null;browser.clear();$('status').textContent='Consultar o probar esta obra no la añade a tu biblioteca.';
     $('chapter-picker').hidden=true;$('chapters').disabled=false;$('chapters').textContent='Consultar capítulos';$('read').disabled=true;
+    $('add').hidden=$('save').hidden=Boolean(item.metadataOnly);$('chapters').closest('section').hidden=Boolean(item.metadataOnly);
+    if(item.metadataOnly){$('start').textContent='Buscar dónde leer';$('status').textContent='Catálogo de fichas: no aloja capítulos. Las sinopsis pueden estar en otro idioma. Busca una edición en tus fuentes de lectura.';}
     $('reason').hidden=!item.reason;$('explanation').textContent=item.reason??'';
     $('matches').textContent=[item.explanation?.sharedTags?.length?'Etiquetas compartidas: '+item.explanation.sharedTags.join(', '):'',item.explanation?.sharedAuthors?.length?'Autoría compartida: '+item.explanation.sharedAuthors.join(', '):''].filter(Boolean).join(' · ');
     $('dislike').hidden=!options.feedback;$('adjust').hidden=!options.adjust;

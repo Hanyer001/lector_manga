@@ -32,7 +32,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .add-button span { font-size: 1.2rem; font-weight: 300; }
 .heading-dot { color: var(--accent); }
 .shelf-heading { display: flex; justify-content: space-between; align-items: center; margin: 36px 0 18px; }
-.shelf-heading h2 { font-size: 1.22rem; font-weight: 530; letter-spacing: -.025em; }
+.shelf-heading h2 { font-size: 1.22rem;  letter-spacing: -.025em; }
 .shelf-heading .small { margin-top: 5px; color: var(--muted); }
 .shelf-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 22px; }
 .search-field { display: flex; align-items: center; gap: 12px; color: var(--muted); min-width: 0; }
@@ -73,24 +73,24 @@ summary::-webkit-details-marker { display: none; }
 .storage-details p { margin-top: 10px; color: var(--muted); font-size: .72rem; }
 .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: inline-block; flex-shrink: 0; }
 .discover-intro { padding: 18px 0 28px; }
-.discover-intro h2 { font-size: 2rem; letter-spacing: -.045em; font-weight: 530; margin-bottom: 8px; }
+.discover-intro h2 { font-size: 2rem; letter-spacing: -.045em;  margin-bottom: 8px; }
 #search-form { display: grid; grid-template-columns: 190px 1fr auto; gap: 20px; padding: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg); }
 #search-status { margin: 22px 0; }
 .small-sheet,.chapter-sheet { width: min(100%, 440px); max-height: calc(100dvh - 40px); overflow: auto; padding: 28px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--panel); box-shadow: 0 30px 90px var(--floating-shadow); }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 15px; }
-.panel-heading h2 { font-size: 1.55rem; font-weight: 520; letter-spacing: -.035em; }
+.panel-heading h2 { font-size: 1.55rem;  letter-spacing: -.035em; }
 .small-sheet > .muted { font-size: .85rem; line-height: 1.8; }
 #add-series-form { display: grid; gap: 10px; }
 #add-series-form .button { margin-top: 12px; }
 #add-status { margin-top: 16px; }
 .picked-series { display: flex; align-items: center; gap: 20px; margin: 20px 0 26px; }
 .picked-series img { width: 84px; height: 122px; object-fit: cover; border-radius: 5px; }
-.picked-series h2 { font-size: 1.4rem; font-weight: 550; letter-spacing: -.035em; line-height: 1.3; margin-bottom: 8px; }
+.picked-series h2 { font-size: 1.4rem;  letter-spacing: -.035em; line-height: 1.3; margin-bottom: 8px; }
 .panel-actions { display: grid; gap: 10px; margin-top: 22px; }
 #picker-status { margin-top: 16px; }
 #cancel-operation { position: fixed; right: 24px; bottom: 24px; z-index: 50; padding-inline: 20px; border: 1px solid var(--border-subtle); border-radius: 30px; background: var(--border-subtle); color: var(--text); box-shadow: 0 10px 30px var(--floating-shadow); }
 .chapter-heading { display: flex; align-items: center; justify-content: space-between; gap: 28px; max-width: 1160px; margin: auto; padding: 34px; }
-.chapter-heading h1 { font-size: clamp(1.4rem, 2.5vw, 2rem); letter-spacing: -.04em; font-weight: 520; margin: 9px 0; }
+.chapter-heading h1 { font-size: clamp(1.4rem, 2.5vw, 2rem); letter-spacing: -.04em;  margin: 9px 0; }
 .chapter-heading .muted { font-size: .8rem; }
 .reader-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-shrink: 0; }
 .reader-settings { position: relative; }
@@ -101,7 +101,7 @@ summary::-webkit-details-marker { display: none; }
 .width-control output { text-align: right; font-size: .7rem; grid-column: 2; }
 .settings-popover .button { width: 100%; margin-top: 16px; }
 .welcome { text-align: center; padding: 80px 20px; }
-.welcome h2 { font-size: 2.5rem; font-weight: 520; letter-spacing: -.05em; margin: 20px 0 28px; }
+.welcome h2 { font-size: 2.5rem;  letter-spacing: -.05em; margin: 20px 0 28px; }
 .notice { margin: 0 auto 20px; max-width: 760px; padding: 15px 20px; color: var(--text); border: 1px solid var(--border-subtle); background: var(--raised); border-radius: 8px; font-size: .85rem; }
 #home-notice { max-width: none; }
 .webtoon { display: block; width: min(100%, var(--reader-width)); margin: 0 auto; padding: 0; border: 0; font-size: 0; line-height: 0; background: var(--panel); }
@@ -115,7 +115,7 @@ summary::-webkit-details-marker { display: none; }
 .page-placeholder p { max-width: 270px; text-align: center; padding-inline: 16px; }
 .chapter-cancel { text-align: center; padding: 20px; }
 .chapter-end { text-align: center; padding: 64px 16px; }
-.chapter-end h2 { font-size: 2.1rem; font-weight: 500; letter-spacing: -.04em; margin: 16px 0 28px; }
+.chapter-end h2 { font-size: 2.1rem;  letter-spacing: -.04em; margin: 16px 0 28px; }
 .end-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .reading-bar { position: fixed; z-index: 10; bottom: 0; inset-inline: 0; height: 56px; display: flex; align-items: center; gap: 26px; padding: 0 5vw; border-top: 1px solid var(--border-subtle); background: var(--surface-glass); backdrop-filter: blur(12px); font-size: .74rem; }
 .reading-position { display: flex; gap: 9px; align-items: center; min-width: 140px; }
