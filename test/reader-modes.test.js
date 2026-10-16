@@ -11,6 +11,8 @@ import { createApp } from '../src/backend/app.js';
 import { normalizeReaderPreferences,pageStep,readingWindow,savedPageAnchor } from '../src/frontend/reader-preferences.js';
 
 test('precarga prioriza visibles, limita futuras a 3–5 y retiene dos anteriores sin reordenar páginas',()=>{
+  assert.deepEqual(readingWindow(60,0,0).load,[0,1,2,3]);
+  assert.equal(normalizeReaderPreferences().prefetch,3);
   assert.deepEqual(readingWindow(72,30,31,4),{load:[30,31,32,33,34,35],retain:[30,31,32,33,34,35,29,28]});
   assert.deepEqual(readingWindow(72,71,71,5),{load:[71],retain:[71,70,69]});
   assert.deepEqual(readingWindow(2,0,0,3),{load:[0,1],retain:[0,1]});
