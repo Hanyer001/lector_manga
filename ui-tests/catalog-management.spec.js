@@ -57,7 +57,7 @@ test('Descubrir restaura etiquetas, catálogo, búsqueda y orden desde URL e his
   await page.goto(demo.web+hash);await expect(page.locator('#recommend-results .series-card')).toHaveCount(24);
   await expect(page.locator('#rec-country')).toHaveValue('KR');await expect(page.locator('#rec-mode')).toHaveValue('genres');await expect(page.locator('#rec-result-sort')).toHaveValue('title');await expect(page.locator('#rec-result-query')).toHaveValue('Recomendación');
   await page.locator('#recommend-results .series-choice').first().click();await expect(page.locator('.series-preview')).toBeVisible();await page.goBack();await expect(page.locator('.series-preview')).toBeHidden();await expect(page.locator('#rec-result-query')).toHaveValue('Recomendación');
-  await page.locator('#rec-result-sort').selectOption('source');await expect(page).toHaveURL(/sort=source/);await page.goBack();await expect(page.locator('#rec-result-sort')).toHaveValue('title');
+  await page.locator('#discovery-result-options summary').click();await page.locator('#rec-result-sort').selectOption('source');await expect(page).toHaveURL(/sort=source/);await page.goBack();await expect(page.locator('#rec-result-sort')).toHaveValue('title');
   await page.reload();await expect(page.locator('#recommend-results .series-card')).toHaveCount(24);await expect(page.locator('#rec-country')).toHaveValue('KR');
 });
 
