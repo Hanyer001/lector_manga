@@ -111,9 +111,16 @@ body.reader-active:not(.library-open) .topbar { visibility:hidden; pointer-event
 .nav-icon { width:21px; height:21px; flex:none; }
 .topbar::before { display:none; }
 .library-intro { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:24px; }
-.library-intro h1 { font-size:clamp(1.8rem,3.2vw,2.75rem); font-weight:530; letter-spacing:-.055em; margin:8px 0; line-height:1.12; }
+.library-intro h1 { font-size:clamp(1.8rem,3.2vw,2.75rem);  letter-spacing:-.055em; margin:8px 0; line-height:1.12; }
 .library-intro .eyebrow { margin-bottom:10px; }
 .library-intro .muted { font-size:.9rem; line-height:1.6; }
 @media(max-width:767px) { .topbar .brand { font-size:1.35rem; } }
 :root[data-glass=false] .topbar,:root[data-glass=false] .library-tabs { background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }
 @media(prefers-reduced-transparency:reduce) { .topbar,.library-tabs { background:var(--panel); backdrop-filter:none; -webkit-backdrop-filter:none; } }
+
+/* Jerarquía editorial y cifras estables en toda la interfaz. */
+body { font-variant-numeric:tabular-nums; }
+h1,h2,.brand,.section-heading h2 { font-family:var(--font-heading); font-weight:700; }
+.brand { font-weight:800; }
+.eyebrow,.home-news .eyebrow { font-family:var(--font-label); font-size:.75rem; font-weight:500; text-transform:uppercase; letter-spacing:.1em; }
+input,button,select,textarea { font-variant-numeric:tabular-nums; }

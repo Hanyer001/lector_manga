@@ -150,6 +150,7 @@ export function createPrivateVault({transport,sync,owner,openStore=loadPrivateDa
     if(route==='/api/series'&&method==='POST')return mutate(async()=>{
       let details=body.metadata??{},title=body.titulo,cover=body.portada,url=body.url_origen;
       if(!body.source)body.source=(await raw('/api/sources/detect?url='+encodeURIComponent(url))).data.id;
+      if(['anilist','comick'].includes(body.source))throw failure('Este catálogo aporta fichas. Busca una fuente de lectura para guardar la obra.','UNSUPPORTED_OPERATION',400);
       if(!title){details=(await raw(`/api/sources/${encodeURIComponent(body.source)}/manga?url=${encodeURIComponent(url)}`)).data.manga;title=details.title;cover??=details.cover;url=details.url;}
       const row=db.saveFavorite({...body,titulo:title,portada:cover,url_origen:url,metadata:details});return db.updateLibrary(row.id,{is_private:true});
     });

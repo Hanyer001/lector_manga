@@ -10,6 +10,19 @@ utilizar otras fuentes.
 
 ## Estado
 
+Actualización del 16 de octubre de 2026:
+
+- **AniList · Fichas:** búsqueda y recomendaciones mediante GraphQL público. Aporta títulos alternativos, sinopsis, autoría, géneros, temas y portadas; no aloja capítulos. La interfaz ofrece buscar una edición de lectura. Los textos del catálogo pueden estar en inglés. No se envían PIN, contraseñas ni contenido de la biblioteca privada.
+- **ComicK · Fichas:** se verificó la búsqueda pública en `api.comick.dev/v1.0/search`. `comick.io` redirige a `comick.dev`. Las rutas de capítulos, ficha completa y web respondieron HTTP 403 desde esta conexión: se habilita la búsqueda de fichas, sin presentar capítulos ni portadas como operativos. Los detalles se recuperan de los resultados de búsqueda y su caché temporal.
+- **Ikigai Mangas:** el portal `ikigaimangas.com` enlaza a `visualikigai.com`, que redirige al dominio declarado en el registro. Lectura de cómics públicos, catálogo en Descubrir y alta por enlace. La búsqueda global del sitio usa una función interna no integrada, por lo que no se anuncia búsqueda por título. Recorre la paginación completa de capítulos; analiza el estado Qwik como datos sin ejecutar scripts, comprueba bloqueos, excluye banners y conserva el orden de páginas. Prueba real: 314 capítulos y 13 páginas del capítulo 0 de *Punto De Vista Del Lector Omnisciente*.
+- **Olympus:** ya estaba integrado y conserva su adaptador de lectura y recomendaciones.
+- **Bato:** el dominio solicitado redirige al aviso de cierre de CODA; permanece deshabilitado. No se agregan espejos de identidad desconocida.
+- **MANGA Plus:** su API `jumpg-webapi.tokyo-cdn.com` respondió HTTP 403. Permanece pendiente de un adaptador verificable. Su web oficial ofrece algunos capítulos iniciales y recientes, no una numeración completa gratuita.
+
+**ZonaTMO configurable:** `TMO_BASE_URL=https://dominio-publico.example/` cambia el origen, la detección y el Referer sin editar código. `TMO_IMAGE_ORIGINS=https://cdn.example,https://cdn2.example` declara explícitamente los servidores de imágenes del dominio nuevo. Solo se aceptan orígenes HTTPS, sin rutas, credenciales ni direcciones locales. Al configurar un dominio explícito se permite probarlo en Render; esto no garantiza que el sitio acepte ese alojamiento. Sin estas variables se conserva el dominio actual y su restricción conocida en Render. No se desactiva la verificación TLS ni se resuelven desafíos anti-bot automáticamente.
+
+**Tipografías:** Inter, Plus Jakarta Sans y JetBrains Mono se sirven desde `src/frontend/fonts/`, con sus licencias OFL. Las dos nuevas fuentes son WOFF2 latinas de 27.348 y 40.404 bytes; no se consulta Google Fonts en tiempo de ejecución.
+
 | ID | Sitio | Adaptador | Condiciones |
 |---|---|---|---|
 | manhwaweb | ManhwaWeb | Activo, API JSON | Español; capítulos alojados en el propio sitio; conserva versiones por URL |

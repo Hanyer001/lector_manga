@@ -1,4 +1,6 @@
-@font-face { font-family: Inter; src: url('/fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: Inter; src: url('./fonts/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family:'Plus Jakarta Sans'; src:url('./fonts/PlusJakartaSans.woff2') format('woff2'); font-weight:200 800; font-style:normal; font-display:swap; }
+@font-face { font-family:'JetBrains Mono'; src:url('./fonts/JetBrainsMono.woff2') format('woff2'); font-weight:100 800; font-style:normal; font-display:swap; }
 body { font-family:inherit; }
 .muted,.small,.series-details,.shelf-heading .small,.search-field,.search-field input::placeholder,.library-options summary,.library label:not(.search-field),.settings-popover label,.library-footer,.storage-details p,.reader-settings summary,.save-status { color:var(--muted); }
 .eyebrow,.brand-dot,.heading-dot,#progress-label { color:var(--accent-text); }
@@ -67,7 +69,7 @@ input[type='color'] { width:64px; height:44px; border:1px solid var(--border-sub
 .filter-chips:empty { margin:0; }
 .filter-chips .button { border-radius:999px; font-size:.74rem; min-height:36px; padding:6px 12px; }
 .section-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:32px 0 16px; }
-.section-heading h2 { font-size:1.2rem; font-weight:550; letter-spacing:-.025em; }
+.section-heading h2 { font-size:1.2rem;  letter-spacing:-.025em; }
 .section-heading p { margin-top:5px; }
 .continue-carousel { display:flex; gap:20px; overflow-x:auto; padding:6px 4px 16px; scroll-snap-type:x mandatory; }
 .continue-carousel .series-card { flex:0 0 180px; scroll-snap-align:start; }

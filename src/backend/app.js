@@ -24,6 +24,7 @@ export function createApp({ database: localDatabase, sources = defaultSources, t
   const privateAccess = createPrivateAccess(database);
   const diagnostics = new Map();
   const withCover = (item, source, referer) => {
+    if(source.metadataOnly)item={...item,metadataOnly:true};
     if (!item.cover && !item.portada) return { ...item, coverUrl: null };
     try {
       const url = allowedImageUrl(item.cover ?? item.portada, source);
@@ -218,6 +219,7 @@ export function createApp({ database: localDatabase, sources = defaultSources, t
     const id = body.source ?? detectSource(sources, body.url_origen).id;
     const source = sourceFor(sources, id);
     let url = allowedPageUrl(body.url_origen, source);
+    if(source.metadataOnly)throw new ApiError(400,'UNSUPPORTED_OPERATION','Este catálogo aporta fichas. Busca una fuente de lectura para guardar la obra.');
     let titulo = body.titulo;
     let portada = body.portada;
     let metadata = {};

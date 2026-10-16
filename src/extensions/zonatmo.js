@@ -9,11 +9,11 @@ const country=type=>({manga:'JP',manhwa:'KR',manhua:'CN'})[type]??null;
 const status=value=>/public[aá]ndose|emisi[oó]n|ongoing/i.test(value)?'ongoing':/completado|finalizado|completed/i.test(value)?'completed':/pausa|hiatus/i.test(value)?'hiatus':/cancelado/i.test(value)?'cancelled':null;
 
 export default class ZonaTMO extends BaseScraper {
-  constructor(options={}){const config=definitionFor('tmo');super({...config,...options,id:config.id});this.cache=new Map();this.recommendationBudgetMs=options.recommendationBudgetMs??6500;}
+  constructor(options={}){const config=definitionFor('tmo');super({...config,...options,id:config.id});this.imageOrigins=options.imageOrigins??config.imageOrigins;this.cache=new Map();this.recommendationBudgetMs=options.recommendationBudgetMs??6500;}
   resource(value,chapter=false){const url=new URL(this.pageUrl(value));
     if(!(chapter?/^\/view_uploads\/[1-9]\d*\/?$/:/^\/library\/(manga|manhwa|manhua|webtoon|comic|one-shot|oneshot|doujinshi|oel)\/[1-9]\d*\/[^/]+\/?$/i).test(url.pathname))throw fail('Enlace de ZonaTMO inválido.','INVALID_URL');url.search='';return url.href;
   }
-  image(value,base){const url=new URL(this.resolveUrl(value,base));if(url.protocol!=='https:'||url.port||!definitionFor(this.id).imageOrigins.includes(url.origin))throw fail('Alojamiento de imágenes de ZonaTMO no verificado.','INVALID_ORIGIN');return url.href;}
+  image(value,base){const url=new URL(this.resolveUrl(value,base));if(url.protocol!=='https:'||url.port||!this.imageOrigins.includes(url.origin))throw fail('Alojamiento de imágenes de ZonaTMO no verificado.','INVALID_ORIGIN');return url.href;}
   cards($,base){const items=new Map();$('a[href*="/library/"]').each((_,el)=>{const link=$(el);let url;try{url=this.resource(this.resolveUrl(link.attr('href'),base));}catch{return;}
     const title=cleanText(link.find('.thumbnail-title h4').first().text());if(!title)return;const box=link.find('.thumbnail.book'),cover=box.find('img.cover-bg-img').attr('src')??box.attr('data-bg');let image=null;try{if(cover)image=this.image(cover,base);}catch{/* Una portada externa no autoriza un nuevo servidor. */}
     items.set(url,{title,url,cover:image,country:country(new URL(url).pathname.split('/')[2]),status:status(box.find('.book-meta-status').text()),...comicTags([box.find('.demography').text()]),language:'es'});

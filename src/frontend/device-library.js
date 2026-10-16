@@ -50,6 +50,7 @@ export function createDeviceLibrary({transport,storage=openDeviceStorage(),openS
     if(route==='/api/series'&&method==='GET')return decorate(db.listVisibleSeries(url.searchParams.get('scope')??'library'),options);
     if(route==='/api/series'&&method==='POST'){
       const source=body.source??(await read('/api/sources/detect?url='+encodeURIComponent(body.url_origen),{signal:options.signal})).id;
+      if(['anilist','comick'].includes(source))throw fail('Este catálogo aporta fichas. Busca una fuente de lectura para guardar la obra.','UNSUPPORTED_OPERATION',400);
       const details=body.titulo?{title:body.titulo,url:body.url_origen,cover:body.portada,...body.metadata}:(await read(`/api/sources/${source}/manga?url=${encodeURIComponent(body.url_origen)}`,{signal:options.signal})).manga;
       return save(()=>db.saveFavorite({source,titulo:details.title,url_origen:details.url,portada:details.cover,metadata:details}));
     }

@@ -16,7 +16,7 @@ export function createSourceAlternatives({api,state,preview,select,sourceName}) 
     };
     if(item.work_id)for(const candidate of state().series.filter(row=>row.work_id===item.work_id&&!row.is_private))append(candidate,true);
     if(!dialog.open)dialog.showModal();status.textContent='Buscando ediciones en otros catálogos…';
-    const queue=state().sources.filter(source=>source.enabled&&!source.demo&&source.capabilities.search&&source.id!==item.source);let failures=0,total=queue.length;
+    const queue=state().sources.filter(source=>source.enabled&&!source.demo&&source.capabilities.search&&source.capabilities.chapters&&source.id!==item.source);let failures=0,total=queue.length;
     const query=(item.title??item.titulo??'').slice(0,200),titles=new Set([query,...(item.altTitles??[])].map(normalizeTag));
     await Promise.all(Array.from({length:Math.min(3,queue.length)},async()=>{while(queue.length&&!signal.aborted){const source=queue.shift(),request=new AbortController(),abort=()=>request.abort(),timer=setTimeout(abort,8000);signal.addEventListener('abort',abort,{once:true});try{const data=await api(`/api/sources/${encodeURIComponent(source.id)}/search?`+new URLSearchParams({q:query}),{signal:request.signal});if(signal.aborted)return;const items=(data.results??[]).sort((a,b)=>Number(titles.has(normalizeTag(b.title)))-Number(titles.has(normalizeTag(a.title))));for(const candidate of items.slice(0,3))append(candidate);}catch{failures++;}finally{clearTimeout(timer);signal.removeEventListener('abort',abort);}}}));
     if(!signal.aborted)status.textContent=`${results.children.length} posibles ediciones · ${total-failures} catálogos consultados${failures?` · ${failures} sin respuesta`:''}. No se han guardado ni vinculado obras.`;
