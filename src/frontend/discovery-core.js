@@ -127,6 +127,6 @@ export function rankRecommendations(candidates,{library=[],feedback=[],filters={
 }
 export function equivalentChapter(chapters, number) {
   if(typeof number!=='number'||!Number.isFinite(number))return {chapter:null,ambiguous:false};
-  const matches=chapters.filter(c=>c.numero===number);
+  const matches=chapters.filter(c=>(c.aligned_number??c.numero)===number);
   return {chapter:matches.length===1?matches[0]:null,ambiguous:matches.length>1};
 }

@@ -27,9 +27,9 @@ export function mountDiscovery(app,{database,sources,consult,withCover,sourceTim
     const work=database.getWork(id),source=work.editions.find(e=>e.id===Number(from)),target=work.editions.find(e=>e.id===Number(to));
     if(!source||!target||source.id===target.id)throw new ApiError(400,'EDITION_MISMATCH','Elige dos fuentes distintas de esta obra.');
     const progress=database.getProgress(source.id),chapter=progress?database.getChapter(progress.capitulo_id):null;
-    const match=equivalentChapter(database.listChapters(target.id),chapter?.numero);
-    return {from:source.id,to:target.id,number:chapter?.numero??null,chapter:match.chapter,ambiguous:match.ambiguous,
-      canTransfer:Boolean(match.chapter),message:match.chapter?'Número coincidente. La otra traducción puede dividir los capítulos de forma distinta; se empezará desde el inicio.':match.ambiguous?'Hay varias traducciones con este número. Elige el capítulo manualmente.':'No hay una correspondencia única. Actualiza la fuente o elige un capítulo manualmente.'};
+    const number=chapter?.aligned_number??chapter?.numero??null,match=equivalentChapter(database.listChapters(target.id),number);
+    return {from:source.id,to:target.id,number,chapter:match.chapter,ambiguous:match.ambiguous,
+      canTransfer:Boolean(match.chapter),message:match.chapter?'Numeración común coincidente. Comprueba que corresponde a la misma parte de la historia; se empezará desde el inicio.':match.ambiguous?'Hay varios capítulos con esta numeración común. Ajusta las equivalencias antes de continuar.':'No hay una correspondencia única. Usa Alinear capítulos o elige un capítulo manualmente.'};
   };
   app.get('/api/works/:id/transfer',(req,res)=>res.json(transferInfo(req.params.id,req.query.from,req.query.to)));
   app.post('/api/works/:id/transfer',(req,res)=>{

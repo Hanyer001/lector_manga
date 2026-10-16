@@ -8,6 +8,11 @@ export function normalizeMetadata(input = {}, strict = false) {
     return {};
   }
   const result = {};
+  if(input.chapterAlignment!==undefined&&strict){
+    const entries=input.chapterAlignment;
+    if(!Array.isArray(entries)||entries.length>1000||entries.some(entry=>!entry||typeof entry.url!=='string'||entry.url.length>2000||!/^https?:\/\//.test(entry.url)||typeof entry.number!=='number'||!Number.isFinite(entry.number)||entry.number<0||entry.number>100000)||new Set(entries.map(entry=>entry.url)).size!==entries.length)throw new ApiError(400,'INVALID_METADATA','Numeración común inválida. Usa números entre 0 y 100000 y un ajuste por capítulo.');
+    result.chapterAlignment=entries.map(({url,number})=>({url,number}));
+  }
   if (input.contentRating !== undefined) {
     if (['safe','suggestive','erotica','pornographic','adult'].includes(input.contentRating)) result.contentRating = input.contentRating;
     else if (strict) throw new ApiError(400, 'INVALID_METADATA', 'Clasificación de contenido inválida.');

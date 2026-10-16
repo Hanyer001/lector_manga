@@ -7,6 +7,7 @@ import { enhanceSelects, syncSelectControls } from './ui-controls.js';
 import { initializeDialog, createDetailTabs } from './dialog-ui.js';
 import { changeView } from './view-transitions.js';
 import {parseLibraryRoute,libraryRouteHash,libraryRouteFields} from './library-route.js';
+import {parseCatalogRoute} from './catalog-route.js';
 import {homeModel} from './home-model.js';
 import { createShell } from './shell.js';
 import { groupWorks } from './discovery-core.js';
@@ -52,7 +53,7 @@ const dialogOrigins = new Map();
 const dialogs = ['add-panel','chapter-controls','folder-panel','more-panel'];
 const detailTabs=createDetailTabs();
 let pickedWorkKey;
-for(const id of dialogs)initializeDialog($(id),{onClose:()=>syncDialogState(id,false)});
+for(const id of dialogs)initializeDialog($(id),{onClose:()=>{if(id==='chapter-controls')releaseModal('detail');syncDialogState(id,false);}});
 const chapterBrowser = createChapterBrowser($('chapter-browser'), {onChoose: chapter => openChapter(chapter.id)});
 let pickedChapterId = null;
 $('picked-read').addEventListener('click', () => { if (pickedChapterId != null) openChapter(pickedChapterId); });
@@ -75,13 +76,40 @@ let reconciling = false;
 let activeView = 'library';
 const viewScroll = new Map();
 let routesReady=false,restoringFilters=false,lastRestoredUrl='';
+let openingReader=false;
+let modalReturnFocus=false;
+const trialHistory=new Map(),previewHistory=new Map();
+const navigationStamp=()=>location.href+'|'+JSON.stringify(history.state?.lector??null);
+function currentViewHash(view=activeView){return ['discover','explore'].includes(view)?shell?.catalogHash(view)??'#'+view:libraryRouteHash(view,currentLibraryFilters());}
+function writeCatalogRoute(mode='push'){
+  if(!routesReady||restoringFilters||!['discover','explore'].includes(activeView)||$('library').hidden)return;
+  const hash=currentViewHash();
+  if(location.hash!==hash){history[mode==='replace'?'replaceState':'pushState']({view:activeView},'',navigationUrl(hash));lastRestoredUrl=navigationStamp();}
+}
+function restoreCatalogFilters(view,hash){restoringFilters=true;try{shell?.restoreCatalog(view,parseCatalogRoute(hash).filters);}finally{restoringFilters=false;}}
+function rememberDetail(item,{fromHistory=false}={}){
+  if(!routesReady||fromHistory||item.is_private)return;
+  const method=history.state?.lector?.kind==='detail'?'replaceState':'pushState';
+  history[method]({view:activeView,lector:{kind:'detail',id:item.id}},'',navigationUrl(currentViewHash()));lastRestoredUrl=navigationStamp();
+}
+function releaseModal(kind,token){
+  const entry=history.state?.lector;if(openingReader||entry?.kind!==kind||token&&entry.token!==token)return;
+  modalReturnFocus=kind==='detail';
+  history.replaceState({view:activeView},'',location.href);history.back();
+}
+function rememberPreview(item,settings){
+  if(settings?.fromHistory)return settings.historyToken;
+  writeCatalogRoute('replace');const token=crypto.randomUUID();previewHistory.set(token,{item,settings});
+  if(previewHistory.size>4)previewHistory.delete(previewHistory.keys().next().value);
+  history.pushState({view:activeView,lector:{kind:'preview',token}},'',navigationUrl(currentViewHash()));lastRestoredUrl=navigationStamp();return token;
+}
 const queryRouteDebounced=debounce(()=>writeLibraryRoute(),350);
 function currentLibraryFilters(){return Object.fromEntries(Object.entries(libraryRouteFields).map(([key,id])=>[key,$(id).type==='checkbox'?($(id).checked?'1':''):$(id).value]));}
 function navigationUrl(hash){const params=new URLSearchParams(location.search);params.delete('chapter');return location.pathname+(params.size?'?'+params:'')+hash;}
 function writeLibraryRoute(mode='push'){
   if(!routesReady||restoringFilters||activeView!=='library'||$('library').hidden)return;
   const hash=libraryRouteHash('library',currentLibraryFilters());
-  if(location.hash!==hash){history[mode==='replace'?'replaceState':'pushState']({view:'library'},'',navigationUrl(hash));lastRestoredUrl=location.href;}
+  if(location.hash!==hash){history[mode==='replace'?'replaceState':'pushState']({view:'library'},'',navigationUrl(hash));lastRestoredUrl=navigationStamp();}
 }
 function restoreLibraryFilters(filters){
   restoringFilters=true;queryRouteDebounced.cancel();
@@ -89,7 +117,7 @@ function restoreLibraryFilters(filters){
     const control=$(id),value=filters[key]??(key==='sort'?'recent':'');
     if(control.type==='checkbox')control.checked=value==='1';else control.value=value;
   }
-  syncSelectControls('reading-filter');restoringFilters=false;
+  syncSelectControls('reading-filter');syncSelectControls('publication-filter');restoringFilters=false;
 }
 const queries = new Set();
 function beginQuery() { const controller = new AbortController(); queries.add(controller); $('cancel-operation').hidden = false; return controller; }
@@ -187,7 +215,10 @@ function setDialog(id, open) {
     for (const other of dialogs) if (other !== id) setDialog(other, false);
     rememberDialogOrigin(id, document.activeElement);
   }
-  if(open){panel.hidden=false;panel.showModal();}else panel.close();
+  if(open){panel.hidden=false;panel.showModal();}else {
+    if(id==='chapter-controls'&&history.state?.lector?.kind==='detail')history.replaceState({view:activeView},'',location.href);
+    panel.close();
+  }
   syncDialogState(id,open);
   if(open)(id==='add-panel'?$('series-url'):id==='folder-panel'?$('folder-name'):id==='more-panel'?$('more-close'):$('picker-close')).focus({preventScroll:true});
 }
@@ -540,9 +571,11 @@ function renderPages(images, saved) {
 }
 
 async function openChapter(id,{trial=null,fromHistory=false}={}) {
+  openingReader=true;
   queryRouteDebounced.cancel();
   const enteredFromLibrary=!$('library').hidden&&!fromHistory;
-  if(enteredFromLibrary&&!trial)history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters())));
+  const fromModal=['detail','preview'].includes(history.state?.lector?.kind);
+  if(enteredFromLibrary&&!fromHistory)history.replaceState({view:activeView},'',navigationUrl(currentViewHash()));
   const origin=trial?.item??series.find(item=>item.id===chapters.find(chapter=>String(chapter.id)===String(id))?.serie_id)??series.find(item=>String(item.ultimo_capitulo_id)===String(id));
   let target=trial?trial.list.find(chapter=>chapter.id===id):chapters.find(chapter=>String(chapter.id)===String(id)),prefetchedList;
   const previousSave=flushProgress()??writer.running;
@@ -597,12 +630,14 @@ async function openChapter(id,{trial=null,fromHistory=false}={}) {
     $('close-chapter').hidden = false;
     $('reload-chapter').hidden = false;
     updateNavigation();
-    if(trial||current.privateReading)history.replaceState(null,'',trial?navigationUrl(libraryRouteHash(trial.returnView,currentLibraryFilters())):navigationUrl('#private'));
+    if(trial){
+      if(!fromHistory){const token=crypto.randomUUID();trialHistory.set(token,{id:current.id,trial});if(trialHistory.size>4)trialHistory.delete(trialHistory.keys().next().value);history[enteredFromLibrary&&!fromModal?'pushState':'replaceState']({view:trial.returnView,lector:{kind:'trial',token}},'',navigationUrl(currentViewHash(trial.returnView)));}
+    }else if(current.privateReading)history.replaceState(null,'',navigationUrl('#private'));
     else {
       const params=new URLSearchParams(location.search);params.set('chapter',String(current.id));
-      history[enteredFromLibrary?'pushState':'replaceState']({reader:true,chapter:current.id},'',location.pathname+'?'+params);
+      if(!fromHistory)history[enteredFromLibrary&&!fromModal?'pushState':'replaceState']({reader:true,chapter:current.id},'',location.pathname+'?'+params);
     }
-    lastRestoredUrl=location.href;
+    lastRestoredUrl=navigationStamp();
     await new Promise(resolve => requestAnimationFrame(resolve));
     if (signal.aborted) return;
     const serverSaved = savedProgress?.capitulo_id === current.id ? savedProgress : null;
@@ -643,6 +678,7 @@ async function openChapter(id,{trial=null,fromHistory=false}={}) {
     notice(`${error.message} ${failedReading?'Puedes buscar otra fuente desde el lector.':'Puedes volver a abrirlo desde la biblioteca.'}`);
     restoring = false;
   } finally {
+    if(chapterAbort?.signal===signal)openingReader=false;
     if (!signal.aborted) { pages.setAttribute('aria-busy', 'false'); $('chapter-cancel').hidden = true; }
   }
 }
@@ -779,15 +815,10 @@ function renderHero() {
   else if (!validCover) cover.removeAttribute('src');
   cover.onerror = () => { cover.hidden = true; $('hero-fallback').hidden = false; };
 }
-async function selectSeries(item) {
+async function selectSeries(item,{fromHistory=false}={}) {
   const origin = document.activeElement;
   const workKey=item.work_id??item.id;
   if(pickedWorkKey!==workKey){pickedWorkKey=workKey;detailTabs.select('chapters');}
-  if (!visibleSeries().some(series => series.id === item.id)) {
-    $('source-filter').value = ''; $('library-query').value = ''; $('only-unread').checked = false;
-    filterLibrary('');
-    shell?.clearFilters();
-  }
   if(![...$('series-select').options].some(option=>option.value===String(item.id)))$('series-select').add(new Option(item.titulo,item.id));
   $('series-select').value = String(item.id); cards();
   $('picked-title').textContent = item.work_title??item.titulo; $('picked-source').textContent = sourceName(item.source)+(item.work_title&&item.titulo!==item.work_title?` · ${item.titulo}`:'');
@@ -805,6 +836,7 @@ async function selectSeries(item) {
   cover.onerror = () => { cover.hidden = true; };
   $('picker-status').textContent = 'Cargando capítulos…';
   setDialog('chapter-controls', true);
+  rememberDetail(item,{fromHistory});
   rememberDialogOrigin('chapter-controls', origin?.isConnected ? origin : document.querySelector('#series-grid .series-card.selected .series-choice') ?? $('show-saved'));
   await loadLibraryChapters();
   if ($('chapter-controls').open&&detailTabs.active==='chapters') chapterBrowser.focus();
@@ -840,7 +872,7 @@ function filterLibrary(selectedId = $('series-select').value) {
   fillChapters([]); $('sync-chapters').disabled = !$('series-select').value;
   cards();
   shell?.renderChips();
-  syncSelectControls('reading-filter');
+  syncSelectControls('reading-filter');syncSelectControls('publication-filter');
   renderEmptyState();
   if ($('series-select').value) loadLibraryChapters();
 }
@@ -850,12 +882,13 @@ function showSearch(show) {
 function navigateView(view, push = true) {
   queryRouteDebounced.cancel();
   if(push)writeLibraryRoute('replace');
+  if(push)writeCatalogRoute('replace');
   const destination=['home','library','discover','explore','settings','private'].includes(view)?view:'home';
   // El historial cambia al pulsar: Atrás no debe esperar a la animación.
   if(push){
-    const hash=libraryRouteHash(destination,currentLibraryFilters());
+    const hash=currentViewHash(destination);
     if(location.hash!==hash)history.pushState({view:destination},'',navigationUrl(hash));
-    lastRestoredUrl=location.href;
+    lastRestoredUrl=navigationStamp();
   }
   return changeView(()=>applyView(destination,push),{animate:push&&(activeView!==destination||$('library').hidden),privateView:activeView==='private'||destination==='private'||Boolean(current?.privateReading)});
 }
@@ -875,7 +908,7 @@ function applyView(view,push) {
   $('show-more').setAttribute('aria-pressed', String(['settings','private'].includes(view)));
   renderEmptyState();
   (matchMedia('(max-width:767px)').matches && view==='explore' ? $('search-query') : $(buttons[view])).focus({preventScroll:true});window.scrollTo(0,viewScroll.get(view)??0);
-  lastRestoredUrl=location.href;
+  lastRestoredUrl=navigationStamp();
   document.title=view==='private'?'Lector · Biblioteca privada':view==='discover'?'Lector · Descubrir':'Lector · Tu biblioteca';
   privacy?.enter(view);
   if(view==='library')filterLibrary();
@@ -926,7 +959,7 @@ async function closeChapter() {
   $('chapter-title').textContent = 'Una historia, sin interrupciones.';
   $('chapter-meta').textContent = 'Capítulo cerrado. Las imágenes se cargarán de nuevo cuando lo abras.';
   $('page-position').textContent = 'Listo para leer'; $('reading-progress').value = 0; $('progress-label').textContent = '0%';
-  history.replaceState({view:returnView??activeView}, '', navigationUrl(libraryRouteHash(returnView??activeView,currentLibraryFilters()))); document.title = 'Lector Manga'; window.scrollTo(0, 0);
+  history.replaceState({view:returnView??activeView}, '', navigationUrl(currentViewHash(returnView??activeView))); document.title = 'Lector Manga'; window.scrollTo(0, 0);
   await navigateView(returnView??activeView);loadLibrary();
 }
 
@@ -938,7 +971,7 @@ $('hero-details').addEventListener('click',()=>{if(heroSeries)selectSeries(heroS
 async function openAddDialog(origin=$('add-toggle')){await setLibrary(true);$('add-status').textContent='';setDialog('add-panel',true);rememberDialogOrigin('add-panel',origin);}
 $('add-toggle').addEventListener('click',()=>openAddDialog());
 $('add-close').addEventListener('click', () => setDialog('add-panel', false));
-$('picker-close').addEventListener('click', () => setDialog('chapter-controls', false));
+$('picker-close').addEventListener('click', () => {releaseModal('detail');setDialog('chapter-controls', false);});
 $('refresh-library').addEventListener('click', loadLibrary);
 $('source-filter').addEventListener('change', () => {filterLibrary('');writeLibraryRoute();});
 $('add-series-form').addEventListener('submit', event => { event.preventDefault(); addFavorite($('series-url').value.trim()); });
@@ -1006,6 +1039,9 @@ readerUI=createReaderControls({change:changeReaderSettings,jump:jumpToPage,step:
   library:()=>navigateView(series.find(item=>item.id===current?.serie_id)?.is_private?'private':'library'),close:closeChapter,active:()=>Boolean(current&&$('library').hidden)});
 for(const [id,original] of [['previous-chapter','previous'],['next-chapter','next'],['reader-mark','mark-read']])$(id).addEventListener('click',()=>$(original).click());
 function clearSensitive({onlySeries}={}) {
+  previewHistory.clear();trialHistory.clear();
+  if(history.state?.lector?.kind==='preview')history.replaceState({view:activeView},'',location.href);
+  document.querySelector('.series-preview[open]')?.close();
   clearTemporaryCovers();
   const target=series.find(item=>item.id===onlySeries),sensitiveIds=new Set(series.filter(item=>item.is_private||(target&&item.work_id===target.work_id)).map(item=>item.id));
   if(current?.privateReading&&!onlySeries)sensitiveIds.add(current.serie_id);
@@ -1031,28 +1067,48 @@ function clearSensitive({onlySeries}={}) {
   for(const id of ['edition-select','edition-from','edition-existing'])$(id).replaceChildren();
   $('series-select').replaceChildren();fillChapters([]);filterLibrary();renderHero();shell?.renderHome();shell?.clearDiscovery();shell?.clearSearch();
   shell?.clearPrivate();
-  history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters())));document.title='Lector · Tu biblioteca';
+  history.replaceState({view:activeView},'',navigationUrl(currentViewHash()));document.title='Lector · Tu biblioteca';
   return saved;
 }
 let alternatives;
-const preview=createSeriesPreview({api,add:addFavorite,select:selectSeries,sourceName,alternatives:(...args)=>alternatives(...args),read:(item,chapter,list,options)=>options?.saved ? openChapter(item.ultimo_capitulo_id) : openChapter(chapter.id,{trial:{item,list,returnView:activeView}}),findSaved:item=>series.find(row=>!row.is_private&&row.source===item.source&&row.url_origen===(item.url??item.url_origen))});
+const preview=createSeriesPreview({onOpen:rememberPreview,onClose:token=>releaseModal('preview',token),api,add:addFavorite,select:selectSeries,sourceName,alternatives:(...args)=>alternatives(...args),read:(item,chapter,list,options)=>options?.saved ? openChapter(item.ultimo_capitulo_id) : openChapter(chapter.id,{trial:{item,list,returnView:activeView}}),findSaved:item=>series.find(row=>!row.is_private&&row.source===item.source&&row.url_origen===(item.url??item.url_origen))});
 alternatives=createSourceAlternatives({api,state:()=>({series,sources:sourceCatalog}),preview,select:selectSeries,sourceName});
 $('reader-trial-ficha').addEventListener('click',async()=>{if(!current?.trial)return;const {item,returnView}=current.trial;await navigateView(returnView);preview(item);});
 $('reader-failed-alternatives').addEventListener('click',()=>$('reader-alternatives').click());
 $('reader-alternatives').addEventListener('click',()=>{const info=failedReading??(current?{item:current.trial?.item??series.find(item=>item.id===current.serie_id),number:current.number??current.numero??null}:null);if(info?.item&&!info.item.is_private)alternatives(info.item,{number:info.number});});
 shell=createShell({preview,api,state:()=>({series,sources:sourceCatalog,view:activeView,privateUnlocked:privacy?.unlocked()??false}),navigate:navigateView,select:selectSeries,
+  onCatalogRouteChange:writeCatalogRoute,
   resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,filter:()=>{filterLibrary();writeLibraryRoute();},reload:loadLibrary,
   dialog:setDialog,beginQuery,endQuery});
 privacy=createPrivacyUI({api,state:()=>({series,sources:sourceCatalog,folders:shell?.folders()??[]}),navigate:navigateView,reload:loadLibrary,select:selectSeries,resume:item=>openChapter(item.ultimo_capitulo_id),add:addFavorite,clearSensitive,hidePrivate:()=>{setDialog('chapter-controls',false);setDialog('folder-panel',false);shell?.clearPrivate();shell?.update().catch(()=>{});},dialog:setDialog,beginQuery,endQuery});
-function restoreRoute(){
-  if(!routesReady||location.href===lastRestoredUrl)return;lastRestoredUrl=location.href;
+async function restoreRoute(){
+  if(!routesReady||navigationStamp()===lastRestoredUrl)return;lastRestoredUrl=navigationStamp();
+  const entry=history.state,readerEntry=entry?.lector;
+  const trial=readerEntry?.kind==='trial'?trialHistory.get(readerEntry.token):null;
+  if(trial){if(current?.trial&&String(current.id)===String(trial.id))setLibrary(false);else await openChapter(trial.id,{trial:trial.trial,fromHistory:true});return;}
   const chapter=new URLSearchParams(location.search).get('chapter');
   if(!location.hash&&chapter&&/^[1-9]\d*$/.test(chapter)){
-    if(String(current?.id)===chapter)setLibrary(false);else openChapter(chapter,{fromHistory:true});return;
+    if(String(current?.id)===chapter)setLibrary(false);else await openChapter(chapter,{fromHistory:true});return;
   }
   const route=parseLibraryRoute(location.hash);
+  const sameView=!$('library').hidden&&activeView===route.view;
   if(route.view==='library')restoreLibraryFilters(route.filters);
-  navigateView(route.view,false);
+  restoreCatalogFilters(route.view,location.hash);
+  document.querySelector('.series-preview[open]')?.close();
+  if(sameView){
+    const hadDetail=$('chapter-controls').open;
+    setDialog('chapter-controls',false);
+    if(route.view==='library'){filterLibrary();if(hadDetail||modalReturnFocus)syncDialogState('chapter-controls',false);}
+    if(route.view==='discover')shell?.enterDiscover();
+  }else await navigateView(route.view,false);
+  modalReturnFocus=false;
+  if(readerEntry?.kind==='detail'){
+    const item=series.find(row=>row.id===readerEntry.id&&!row.is_private);
+    if(item){history.replaceState(entry,'',location.href);await selectSeries(item,{fromHistory:true});}
+  }else if(readerEntry?.kind==='preview'){
+    const saved=previewHistory.get(readerEntry.token);if(saved)await preview(saved.item,{...saved.settings,fromHistory:true,historyToken:readerEntry.token});
+  }
+  lastRestoredUrl=navigationStamp();
 }
 window.addEventListener('popstate',restoreRoute);
 window.addEventListener('hashchange',restoreRoute);
@@ -1074,10 +1130,11 @@ if(cloudMode&&canLoad)await replayPending();
 const initial = new URLSearchParams(location.search).get('chapter');
 const initialRoute=parseLibraryRoute(location.hash),hasInitialHash=Boolean(location.hash);
 if(initialRoute.view==='library')restoreLibraryFilters(initialRoute.filters);
+if(location.hash.includes('?'))restoreCatalogFilters(initialRoute.view,location.hash);
 routesReady=true;
-if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial,{fromHistory:true}); if (hasInitialHash) { await navigateView(initialRoute.view,false); history.replaceState({view:activeView},'',navigationUrl(libraryRouteHash(activeView,currentLibraryFilters()))); } }
+if (canLoad && initial && /^[1-9]\d*$/.test(initial)) { await openChapter(initial,{fromHistory:true}); if (hasInitialHash) { await navigateView(initialRoute.view,false); history.replaceState({view:activeView},'',navigationUrl(currentViewHash())); } }
 else await navigateView(initialRoute.view,false);
-lastRestoredUrl=location.href;
+lastRestoredUrl=navigationStamp();
 window.lectorStartup?.ready();
 $('add-toggle').disabled=!canLoad;
 if(cloudMode&&canLoad&&accountUser())accountUI.synchronize();

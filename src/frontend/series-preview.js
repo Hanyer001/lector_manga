@@ -4,13 +4,13 @@ import {setCover,clearCover,isProxyUrl} from './network.js';
 import {tagLabel} from './discovery-core.js';
 import {trialChapters,matchingTrialChapter} from './trial-reading.js';
 const statuses={ongoing:'En emisión',completed:'Finalizado',hiatus:'En pausa',cancelled:'Cancelado'};
-export function createSeriesPreview({api,add,select,findSaved,read,alternatives,sourceName=id=>id}) {
+export function createSeriesPreview({api,add,select,findSaved,read,alternatives,sourceName=id=>id,onOpen,onClose}) {
   const dialog=document.createElement('dialog');dialog.className='series-preview';dialog.setAttribute('aria-labelledby','preview-title');
   dialog.innerHTML='<div class="panel-heading"><p class="eyebrow">VISTA PREVIA</p><button type="button" class="button" aria-label="Cerrar vista previa">✕</button></div><div class="picked-series"><img alt="" decoding="async"><div><h2 id="preview-title"></h2><p class="small muted" data-source-name></p><p class="small muted" data-authors></p><p class="small muted" data-publication></p></div></div><p data-tags class="preview-tags"></p><p data-description class="preview-description"></p><div class="preview-primary-actions"><button type="button" class="button primary" data-start>Leer primer capítulo</button><button type="button" class="button" data-save>Guardar en biblioteca</button></div><aside data-reason class="preview-reason" hidden><p class="eyebrow">POR QUÉ TE LA SUGERIMOS</p><p data-explanation></p><p data-matches class="small"></p><div class="panel-actions"><button type="button" class="button" data-dislike>No me interesa</button><button type="button" class="button subtle" data-adjust>Ajustar mis filtros</button></div><p class="small muted">Coincidencias del catálogo; no garantizan el mismo tono o calidad. Puedes ajustar tus géneros y descartar sugerencias.</p></aside><p class="small muted" data-status role="status"></p><section class="preview-chapters"><button type="button" class="button" data-chapters>Consultar capítulos</button><div data-chapter-picker hidden><div data-browser></div><label hidden>Capítulo para probar<select data-chapter-select aria-label="Capítulo para probar"></select></label><label data-equivalence hidden><input type="checkbox" data-confirm> He comprobado que el capítulo corresponde a la otra edición</label><p class="small muted" data-chapter-note></p><button type="button" class="button primary" data-read disabled>Leer sin guardar</button></div></section><div class="panel-actions"><button type="button" class="button primary" data-add>Añadir a biblioteca</button><button type="button" class="button" data-alternatives>Buscar otras fuentes</button><a class="button" target="_blank" rel="noopener noreferrer" data-source>Abrir en la fuente ↗</a></div>';
   document.body.append(dialog);
   initializeDialog(dialog);
   const $=name=>dialog.querySelector('[data-'+name+']'),image=dialog.querySelector('img'),title=dialog.querySelector('h2');
-  let current,controller,list=[],requestedNumber=null,loading=false,options={};
+  let current,controller,list=[],requestedNumber=null,loading=false,options={},historyToken;
   const browser = createChapterBrowser($('browser'), {temporary:true,onChoose:(_chapter,index)=>{ $('chapter-select').value=String(index); updateRead(); }});
   $('save').addEventListener('click',()=>$('add').click());
   $('start').addEventListener('click',async()=>{ if (!current) return;if(current.metadataOnly){$('alternatives').click();return;} const saved=findSaved(current); if(saved){dialog.close();if(saved.ultimo_capitulo_id)read?.(saved,null,null,{saved:true});else await select(saved);return;} const loaded=await loadChapters(); if(!loaded||!current||!list.length||requestedNumber!==null)return; const item=current,chapter=list[0],chapters=list; dialog.close(); read?.(item,chapter,chapters); });
@@ -22,7 +22,7 @@ export function createSeriesPreview({api,add,select,findSaved,read,alternatives,
   };
   const updateRead=()=>{$('read').disabled=!$('chapter-select').value||(!$('equivalence').hidden&&!$('confirm').checked);};
   dialog.querySelector('[aria-label]').addEventListener('click',()=>dialog.close());
-  dialog.addEventListener('close',()=>{controller?.abort();clearCover(image);browser.clear();current=null;list=[];});
+  dialog.addEventListener('close',()=>{if(dialog.open)return;controller?.abort();clearCover(image);browser.clear();current=null;list=[];onClose?.(historyToken);});
   $('dislike').addEventListener('click',()=>{const item=current,feedback=options.feedback;dialog.close();feedback?.(item,'hidden');});$('adjust').addEventListener('click',()=>{const adjust=options.adjust;dialog.close();adjust?.();});
   $('chapter-select').addEventListener('change',updateRead);$('confirm').addEventListener('change',updateRead);
   $('add').addEventListener('click',async()=>{const item=current;if(!item)return;const saved=findSaved(item);dialog.close();if(saved)await select(saved);else await add(item.url??item.url_origen);});
@@ -61,7 +61,7 @@ export function createSeriesPreview({api,add,select,findSaved,read,alternatives,
     $('dislike').hidden=!options.feedback;$('adjust').hidden=!options.adjust;
     image.hidden=!isProxyUrl(item.coverUrl);clearCover(image);if(!image.hidden)setCover(image,item.coverUrl,item.coverKey);
     try{const url=new URL(item.url??item.url_origen);$('source').hidden=!['http:','https:'].includes(url.protocol);if(!$('source').hidden)$('source').href=url.href;}catch{$('source').hidden=true;}
-    if(!dialog.open)dialog.showModal();
+    if(!dialog.open){dialog.showModal();historyToken=onOpen?.(item,settings);}
     try{const result=await api(`/api/sources/${encodeURIComponent(item.source)}/manga?url=${encodeURIComponent(item.url??item.url_origen)}`,{signal});if(signal.aborted||current!==item)return;showMetadata({...item,...result.manga});}
     catch(error){if(!signal.aborted&&current===item)$('status').textContent='No se pudieron completar los detalles. Puedes consultar los capítulos o volver a abrir la ficha.';}
   };

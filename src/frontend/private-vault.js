@@ -171,7 +171,7 @@ export function createPrivateVault({transport,sync,owner,openStore=loadPrivateDa
     if(chapterRoute) {
       const id=Number(chapterRoute[1]);
       if(chapterRoute[2]==='read')return mutate(()=>db.markChapterRead(id,body.read??true));
-      if(chapterRoute[2]==='images') {await refresh();const chapter=db.getChapter(id),series=db.getSeries(chapter.serie_id),result=(await send('/api/vault/images',{source:series.source,url:chapter.url_origen})).data;return {...result,source:series.source,chapter:{...result.chapter,id,serie_id:series.id,privateReading:true}};}
+      if(chapterRoute[2]==='images') {await refresh();const chapter=db.getChapter(id),series=db.getSeries(chapter.serie_id),result=(await send('/api/vault/images',{source:series.source,url:chapter.url_origen})).data;return {...result,source:series.source,chapter:{...result.chapter,id,serie_id:series.id,aligned_number:chapter.aligned_number,privateReading:true}};}
     }
     if(workRoute) {
       const id=Number(workRoute[1]),action=workRoute[2];
@@ -181,7 +181,7 @@ export function createPrivateVault({transport,sync,owner,openStore=loadPrivateDa
       if(action==='transfer') {
         const from=Number(body.from??url.searchParams.get('from')),to=Number(body.to??url.searchParams.get('to')),work=db.getWork(id);
         if(from===to||![from,to].every(seriesId=>work.editions.some(row=>row.id===seriesId)))throw failure('EDITION_MISMATCH','Elige dos fuentes distintas de esta obra.',400);
-        const progress=db.getProgress(from),chapter=progress?db.getChapter(progress.capitulo_id):null,match=equivalentChapter(db.listChapters(to),chapter?.numero),info={from,to,number:chapter?.numero??null,chapter:match.chapter,ambiguous:match.ambiguous,canTransfer:Boolean(match.chapter),message:match.chapter?'Se continuará desde el capítulo equivalente.':'No hay una correspondencia única.'};
+        const progress=db.getProgress(from),chapter=progress?db.getChapter(progress.capitulo_id):null,match=equivalentChapter(db.listChapters(to),chapter?.aligned_number??chapter?.numero),info={from,to,number:chapter?.aligned_number??chapter?.numero??null,chapter:match.chapter,ambiguous:match.ambiguous,canTransfer:Boolean(match.chapter),message:match.chapter?'Se continuará desde el capítulo equivalente.':'No hay una correspondencia única.'};
         if(method==='GET')return info;if(!info.canTransfer)throw failure('CHAPTER_EQUIVALENCE_REQUIRED',info.message,409);
         return mutate(()=>({...info,progress:db.updateProgress({serie_id:to,capitulo_id:info.chapter.id,scroll_position_y:0,page_index:0,page_fraction:0})}));
       }

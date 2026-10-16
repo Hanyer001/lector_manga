@@ -3,19 +3,20 @@ import { syncSelectControls } from './ui-controls.js';
 import { createDiscoveryUI } from './discovery-ui.js';
 import { isPublicReading } from './content-policy.js';
 import {createHomeUI} from './home-ui.js';
+import {catalogRouteHash} from './catalog-route.js';
 
 const $ = id => document.getElementById(id);
 const text = (tag, value, className = '') => Object.assign(document.createElement(tag), { textContent:value, className });
 const sameWork = (a,b) => a.source === b.source && (a.url_origen ?? a.url) === (b.url_origen ?? b.url);
 const filterIds = ['library-query','source-filter','genre-filter','author-filter','publication-filter','reading-filter','folder-filter','only-unread'];
 
-export function createShell({ preview, api, state, navigate, select, resume, add, filter, reload, dialog, beginQuery, endQuery }) {
+export function createShell({ preview, api, state, navigate, select, resume, add, filter, reload, dialog, beginQuery, endQuery, onCatalogRouteChange }) {
   let folders=[],updates=[],folderEditing,updateGeneration=0,searchGeneration=0,searchAbort,syncAbort;
-  let selectedItem,metadataOriginal,searchGroups=[],searchTimer;
+  let selectedItem,metadataOriginal,searchGroups=[],searchTimer,searchRouteActive=false,defaultSearchSources=[];
   const sourceName = id => state().sources.find(source=>source.id===id)?.name ?? id;
   const hasFavorite = item => state().series.some(saved=>sameWork(saved,item));
   const cardOptions = () => ({ sourceName,onSelect:preview,onResume:resume,onAdd:item=>add(item.url),hasFavorite });
-  const discovery=createDiscoveryUI({preview,api,state,reload,select,add,navigate,beginQuery,endQuery,sourceName});
+  const discovery=createDiscoveryUI({preview,api,state,reload,select,add,navigate,beginQuery,endQuery,sourceName,onRouteChange:onCatalogRouteChange});
   const home=createHomeUI({state,navigate,select,resume,sourceName,openLibrary:async mode=>{
     clearFilters();
     if(mode==='reading'||mode==='planned')$('reading-filter').value=mode;
@@ -125,6 +126,7 @@ export function createShell({ preview, api, state, navigate, select, resume, add
       $('source-hub').append(label);
     }
     renderAdultNote();
+    if(first)defaultSearchSources=[...$('source-hub').querySelectorAll('input:checked')].map(input=>input.value);
   }
   function selectedSearchSources(){
     const selection=$('search-source').value,adult=$('search-genre').value==='adult';
@@ -161,6 +163,7 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     $('search-status').textContent=controller.signal.aborted?'Búsqueda cancelada.':`${count} resultados · ${waiting?`${waiting} ${waiting===1?'fuente pendiente':'fuentes pendientes'} · `:''}${errors} ${errors===1?'fuente':'fuentes'} con error.`;
   }
   async function search() {
+    searchRouteActive=true;onCatalogRouteChange?.('replace');
     searchAbort?.abort();const generation=++searchGeneration;const controller=searchAbort=beginQuery();
     const query=$('search-query').value.trim(),adult=$('search-genre').value==='adult';
     renderAdultNote();const ids=selectedSearchSources().map(source=>source.id);
@@ -180,14 +183,15 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     endQuery(controller);
   }
   function scheduleSearch() {
+    searchRouteActive=true;onCatalogRouteChange?.('replace');
     clearTimeout(searchTimer);searchAbort?.abort();
     if($('search-query').value.trim().length<2){searchGeneration++;$('search-status').textContent='Escribe al menos dos caracteres o pulsa Buscar.';return;}
     searchTimer=setTimeout(search,350);
   }
   $('search-query').addEventListener('input',scheduleSearch);
-  $('search-source').addEventListener('change',()=>{renderAdultNote();scheduleSearch();});
-  $('search-genre').addEventListener('change',()=>{renderAdultNote();searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();$('search-status').textContent=$('search-genre').value==='adult'?'Género +18 seleccionado. Escribe un título o pulsa Buscar para descubrir.':'Catálogo general seleccionado.';});
-  $('source-hub').addEventListener('change',()=>{$('search-source').value='selected';renderAdultNote();scheduleSearch();});
+  $('search-source').addEventListener('change',()=>{searchRouteActive=true;onCatalogRouteChange?.();renderAdultNote();scheduleSearch();});
+  $('search-genre').addEventListener('change',()=>{searchRouteActive=true;onCatalogRouteChange?.();renderAdultNote();searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();$('search-status').textContent=$('search-genre').value==='adult'?'Género +18 seleccionado. Escribe un título o pulsa Buscar para descubrir.':'Catálogo general seleccionado.';});
+  $('source-hub').addEventListener('change',()=>{$('search-source').value='selected';searchRouteActive=true;onCatalogRouteChange?.();renderAdultNote();scheduleSearch();});
   async function update() {
     const generation=++updateGeneration;
     const lockedPrivate=state().view==='private'&&!state().privateUnlocked;
@@ -202,7 +206,19 @@ export function createShell({ preview, api, state, navigate, select, resume, add
     await discovery.update();
     for(const group of searchGroups)renderSearchGroup(group);
   }
-  return { folders:()=>folders,update,organize,renderHome,renderChips,clearFilters,enterDiscover:()=>discovery.activate(),clearDiscovery:()=>discovery.clear(),search:()=>{clearTimeout(searchTimer);return search();},hasFavorite,
+  const searchFilters=()=>({q:$('search-query').value.trim(),source:$('search-source').value,genre:$('search-genre').value,sources:[...$('source-hub').querySelectorAll('input:checked')].map(input=>input.value)});
+  function restoreCatalog(view,filters){
+    if(view==='discover'){discovery.restoreRoute(filters);return;}
+    if(view!=='explore')return;
+    if(searchRouteActive&&catalogRouteHash(view,searchFilters())===catalogRouteHash(view,filters))return;
+    clearTimeout(searchTimer);searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();
+    $('search-query').value=filters.q??'';$('search-genre').value=filters.genre??'';
+    $('search-source').value=filters.source??'selected';if(!$('search-source').value)$('search-source').value='selected';
+    const selected=new Set(filters.sources??defaultSearchSources);for(const input of $('source-hub').querySelectorAll('input'))input.checked=selected.has(input.value);
+    searchRouteActive=Object.keys(filters).length>0;renderAdultNote();
+    if(filters.q||filters.genre==='adult')search();
+  }
+  return {catalogHash:view=>catalogRouteHash(view,view==='discover'?discovery.routeFilters():searchRouteActive?searchFilters():{}),restoreCatalog,folders:()=>folders,update,organize,renderHome,renderChips,clearFilters,enterDiscover:()=>discovery.activate(),clearDiscovery:()=>discovery.clear(),search:()=>{clearTimeout(searchTimer);return search();},hasFavorite,
     clearPrivate(){updateGeneration++;selectedItem=undefined;metadataOriginal=undefined;folders=[];folderEditing=undefined;for(const id of ['folder-list','series-folders'])$(id).replaceChildren();for(const id of ['folder-name','series-genres','series-authors','series-themes','edition-url']){const input=$(id);if(input)input.value='';}fill('folder-filter',[],'Todas las historias');},
     clearSearch(){searchAbort?.abort();searchGeneration++;searchGroups=[];$('search-results').replaceChildren();},
     cancelSearch(){searchAbort?.abort();searchGeneration++;},

@@ -1,4 +1,4 @@
-import {orderedChapters} from '../frontend/chapter-order.js';
+import {orderedChapters,alignChapters} from '../frontend/chapter-order.js';
 import { ApiError, httpUrl, positiveId } from '../backend/errors.js';
 import { normalizeMetadata, readingStates } from './metadata.js';
 import { createDiscoveryStore } from './discovery.js';
@@ -65,7 +65,7 @@ export function createDatabaseStore(db, openDatabase) {
     const getChapter = id => {
       const row = chapterById.get(positiveId(id));
       if (!row) throw new ApiError(404, 'CHAPTER_NOT_FOUND', 'Capítulo no encontrado.');
-      return row;
+      return alignChapters([row],getSeries(row.serie_id).chapterAlignment)[0];
     };
 
     return {
@@ -117,7 +117,14 @@ export function createDatabaseStore(db, openDatabase) {
           if (!readingStates.includes(input.reading_state)) throw new ApiError(400, 'INVALID_FIELD', 'Estado personal inválido.');
           db.prepare('UPDATE Series SET reading_state=? WHERE work_id=(SELECT work_id FROM Series WHERE id=?)').run(input.reading_state, id);
         }
-        if (input.metadata !== undefined) mergeMetadata(id, input.metadata, true);
+        if (input.metadata !== undefined) {
+          if(input.metadata.chapterAlignment!==undefined){
+            const urls=new Set(chaptersBySeries.all(id).map(chapter=>chapter.url_origen));
+            const entries=normalizeMetadata(input.metadata,true).chapterAlignment;
+            if(entries.some(entry=>!urls.has(entry.url)))throw new ApiError(400,'CHAPTER_MISMATCH','El ajuste debe pertenecer a un capítulo guardado de esta fuente.');
+          }
+          mergeMetadata(id, input.metadata, true);
+        }
         if (input.folder_ids !== undefined) {
           if (!Array.isArray(input.folder_ids) || input.folder_ids.length > 100) throw new ApiError(400, 'INVALID_FIELD', 'Carpetas inválidas.');
           const folders = [...new Set(input.folder_ids.map(positiveId))];
@@ -160,9 +167,9 @@ export function createDatabaseStore(db, openDatabase) {
             url_origen: httpUrl(chapter.url), numero: chapter.number });
         });
         db.prepare('UPDATE Series SET last_sync_at=? WHERE id=?').run(first_seen_at, serie_id);
-        return orderedChapters(saved);
+        return orderedChapters(alignChapters(saved,series.chapterAlignment));
       }),
-      listChapters(serieId) { return orderedChapters(chaptersBySeries.all(getSeries(serieId).id)); },
+      listChapters(serieId) { const series=getSeries(serieId);return orderedChapters(alignChapters(chaptersBySeries.all(series.id),series.chapterAlignment)); },
       getProgress(serieId) { return progressBySeries.get(getSeries(serieId).id) ?? null; },
       updateProgress: db.transaction(({ serie_id, capitulo_id, scroll_position_y, page_index = null, page_fraction = null, expected_timestamp }) => {
         serie_id = getSeries(serie_id).id;
