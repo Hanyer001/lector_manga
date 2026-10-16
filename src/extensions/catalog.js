@@ -4,6 +4,22 @@ import { createGate, runOperation, operationContext } from '../core/operation.js
 // Registro único: identidad, política de red y cargador de cada fuente.
 export const sourceDefinitions = [
   {
+    id:'anilist',name:'AniList · Fichas',baseUrl:'https://anilist.co/',apiBaseUrl:'https://graphql.anilist.co/',metadataOnly:true,
+    imageOrigins:['https://s4.anilist.co'],capabilities:{search:true,manga:true,chapters:false,images:false,recommend:true},
+    note:'Fichas, autoría y recomendaciones. No aloja capítulos; sinopsis y etiquetas pueden estar en inglés.',load:()=>import('./anilist.js')
+  },
+  {
+    id:'comick',name:'ComicK · Fichas',baseUrl:'https://comick.dev/',pageOrigins:['https://comick.dev','https://comick.io'],apiBaseUrl:'https://api.comick.dev/',metadataOnly:true,
+    imageOrigins:[],capabilities:{search:true,manga:true,chapters:false,images:false},
+    note:'Búsqueda de fichas verificada. Las rutas de capítulos y portadas no se habilitan: respondieron HTTP 403.',load:()=>import('./comick.js')
+  },
+  {
+    id:'ikigai',name:'Ikigai Mangas',baseUrl:'https://visualikigai.cmpunjabrashancard.pk/',pageOrigins:['https://visualikigai.cmpunjabrashancard.pk','https://visualikigai.com'],
+    imageOrigins:['https://image2.ikigaimangas.cloud','https://image3.ikigaimangas.cloud'],recommendationCatalogOnly:true,
+    capabilities:{search:false,manga:true,chapters:true,images:true,recommend:true},
+    note:'Dominio de lectura enlazado por ikigaimangas.com. Explora en Descubrir o añade la URL de una serie; solo cómics públicos.',load:()=>import('./ikigai.js')
+  },
+  {
     id: 'sitio-ejemplo', name: 'Sitio de ejemplo', demo: true,
     baseUrl: 'https://example.com/', imageOrigins: ['https://example.com', 'https://cdn.example.com'],
     capabilities: { search: false, manga: true, chapters: true, images: true },
@@ -116,7 +132,11 @@ export async function createScraper(id, options = {}, definitions = sourceDefini
   }
 }
 
-export function createSources(definitions = sourceDefinitions, {environment = process.env.RENDER === 'true' ? 'render' : 'local'} = {}) {
+export function createSources(definitions = sourceDefinitions, {environment = process.env.RENDER === 'true' ? 'render' : 'local',tmoBaseUrl=process.env.TMO_BASE_URL,tmoImageOrigins=process.env.TMO_IMAGE_ORIGINS} = {}) {
+  const configuredOrigin=value=>{const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password||url.port||url.pathname!=='/'||url.search||url.hash||/^(?:localhost|\d|\[)/i.test(url.hostname)||!url.hostname.includes('.')||/\.(?:local|internal)$/.test(url.hostname))throw new Error('TMO_BASE_URL y TMO_IMAGE_ORIGINS deben ser orígenes HTTPS públicos sin ruta ni credenciales.');return url.origin;};
+  if(tmoBaseUrl){const origin=configuredOrigin(tmoBaseUrl),images=(tmoImageOrigins??'').split(',').map(value=>value.trim()).filter(Boolean).map(configuredOrigin);
+    definitions=definitions.map(source=>source.id==='tmo'?{...source,baseUrl:origin+'/',pageOrigins:[origin],imageOrigins:[origin,...images],unavailableIn:{},note:'Dominio configurado por el administrador con TMO_BASE_URL. La disponibilidad depende de ese servidor.'}:source);
+  }
   const runtimeDefinitions=definitions.map(definition=>definition.unavailableIn?.[environment]?{...definition,enabled:false,reason:definition.unavailableIn[environment]}:definition);
   return new Map(runtimeDefinitions.map(definition => {
     let instance;
@@ -140,7 +160,7 @@ export function createSources(definitions = sourceDefinitions, {environment = pr
 export function publicSource(id, source) {
   return { id, name: source.name ?? id, baseUrl: source.baseUrl ?? `${source.pageOrigin}/`,
     pageOrigins: source.pageOrigins ?? [source.pageOrigin], demo: Boolean(source.demo),
-    enabled: source.enabled !== false, reason: source.reason ?? null, note: source.note ?? null,
+    enabled: source.enabled !== false, reason: source.reason ?? null, note: source.note ?? null,metadataOnly:Boolean(source.metadataOnly),
     languages: source.languages ?? [],
     transport: source.transport ?? (source.apiBaseUrl ? 'api' : 'html'),
     capabilities: source.capabilities ?? { search: false, manga: false, chapters: true, images: true } };
