@@ -27,7 +27,7 @@ test('Privada: mismos filtros, últimas lecturas primero y limpieza al bloquear'
     await page.locator('#private-source-filter').selectOption('qa-local');
     await page.locator('#private-genre-filter').selectOption('Action');
     await page.locator('#private-author-filter').selectOption('Autora reciente');
-    await page.locator('#private-publication-filter').selectOption('ongoing');
+    await page.locator('[data-select="private-publication-filter"] [data-value="ongoing"]').click();
     await page.locator('#private-options summary').click();
     await page.locator('[data-select="private-reading-filter"] [data-value="reading"]').click();
     await expect(page.locator('#private-reading-filter')).toHaveValue('reading');
