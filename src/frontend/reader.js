@@ -136,6 +136,7 @@ function applyLibrary(open, { opening = false } = {}) {
   document.body.classList.toggle('library-open', open);
   const navigation=document.querySelector('nav[aria-label="Navegación principal"]');
   navigation.inert=!open;
+  navigation.removeAttribute('aria-busy');
   if(open)navigation.removeAttribute('aria-hidden');else navigation.setAttribute('aria-hidden','true');
   readerUI?.activate(!open);
   if (open) for (const slot of slots) { slot.cancel?.(); unload(slot); }
