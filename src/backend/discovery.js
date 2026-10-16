@@ -126,8 +126,9 @@ export function mountDiscovery(app,{database,sources,consult,withCover,sourceTim
     }));
     let candidates=safeCandidates();
     if(filters.minChapters>0){
+      if(candidates.some(item=>item.metadataOnly))warnings.push('Los catálogos de fichas se excluyen al exigir capítulos disponibles.');
       // La cantidad se verifica por capítulos únicos en español, no por el último número publicado.
-      candidates=rankRecommendations(candidates,{...ranking,filters:{...filters,minChapters:0}}).slice(0,12);
+      candidates=rankRecommendations(candidates.filter(item=>!item.metadataOnly),{...ranking,filters:{...filters,minChapters:0}}).slice(0,12);
       candidateMap.clear();for(const item of candidates)candidateMap.set(itemKey(item),item);
       let cursor=0,failures=0;
       const signal=AbortSignal.any([req.operationSignal,AbortSignal.timeout(15000)]);
